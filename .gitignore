@@ -1,0 +1,65 @@
+# Dependencies
+node_modules/
+**/node_modules/
+/.pnp
+.pnp.*
+
+# Environment variables & secrets (CRITICAL)
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+**/.env
+**/.env.*
+!**/.env.example
+
+# Sensitive credentials, keys, tokens & CSV exports
+*.pem
+*.key
+*.cert
+*.csv
+razorpay_test_api_keys*.csv
+
+# WhatsApp sessions & local credentials
+whatsapp-session/
+**/whatsapp-session/
+
+# Local media & uploads
+uploads/
+**/uploads/
+
+# Build outputs
+dist/
+**/dist/
+.next/
+**/.next/
+out/
+build/
+*.tsbuildinfo
+next-env.d.ts
+
+# Binaries & Executables
+cloudflared
+**/cloudflared
+*.exe
+*.bin
+
+# Logs & Debug
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+
+# System & IDE files
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+
+# Project private notes & design assets (optional)
+assets/
+plans/
+feature.md
+audit_report.md

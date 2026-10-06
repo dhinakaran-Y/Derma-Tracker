@@ -1,0 +1,289 @@
+@import "tailwindcss";
+
+@layer base {
+  :root {
+    --font-display: 'Space Grotesk', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    --font-body: 'IBM Plex Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    --font-mono: 'IBM Plex Mono', monospace;
+
+    /* Light Mode (Default) */
+    --bg: #F3F5F4;
+    --sidebar-bg: #10161A;
+    --surface: #FFFFFF;
+    --surface-1: #FFFFFF;
+    --surface-card: #FFFFFF;
+    --surface-2: #F8FAF9;
+    --surface-3: #ECEFEB;
+    --border: #DDE2DF;
+    --border-light: #C8D0CD;
+
+    --brass: #A8672D;
+    --brass-glow: rgba(168, 103, 45, 0.15);
+    --brass-hover: #B8763C;
+    --brass-dim: rgba(168, 103, 45, 0.1);
+
+    --text: #172120;
+    --text-dim: #5C6B68;
+    --text-muted: #8E9E9B;
+
+    --success: #2E8552;
+    --success-bg: rgba(46, 133, 82, 0.1);
+    --error: #B83A20;
+    --error-bg: rgba(184, 58, 32, 0.1);
+    --warn: #B58428;
+    --warn-bg: rgba(181, 132, 40, 0.1);
+    --info: #357B9B;
+    --info-bg: rgba(53, 123, 155, 0.1);
+
+    --card-shadow: 0 4px 16px -2px rgba(0, 0, 0, 0.06);
+  }
+
+  [data-theme="light"] {
+    --bg: #F3F5F4;
+    --sidebar-bg: #10161A;
+    --surface: #FFFFFF;
+    --surface-1: #FFFFFF;
+    --surface-card: #FFFFFF;
+    --surface-2: #F8FAF9;
+    --surface-3: #ECEFEB;
+    --border: #DDE2DF;
+    --border-light: #C8D0CD;
+
+    --brass: #A8672D;
+    --brass-glow: rgba(168, 103, 45, 0.15);
+    --brass-hover: #B8763C;
+    --brass-dim: rgba(168, 103, 45, 0.1);
+
+    --text: #172120;
+    --text-dim: #5C6B68;
+    --text-muted: #8E9E9B;
+
+    --success: #2E8552;
+    --success-bg: rgba(46, 133, 82, 0.1);
+    --error: #B83A20;
+    --error-bg: rgba(184, 58, 32, 0.1);
+    --warn: #B58428;
+    --warn-bg: rgba(181, 132, 40, 0.1);
+    --info: #357B9B;
+    --info-bg: rgba(53, 123, 155, 0.1);
+
+    --card-shadow: 0 4px 16px -2px rgba(0, 0, 0, 0.06);
+  }
+
+  [data-theme="dark"],
+  .dark {
+    --bg: #0B0F10;
+    --sidebar-bg: #10161A;
+    --surface: #151C1D;
+    --surface-1: #151C1D;
+    --surface-card: #151C1D;
+    --surface-2: #1B2325;
+    --surface-3: #1F2829;
+    --border: #232D30;
+    --border-light: #2D393C;
+
+    --brass: #C98A4B;
+    --brass-glow: rgba(201, 138, 75, 0.15);
+    --brass-hover: #D99B5C;
+    --brass-dim: rgba(201, 138, 75, 0.1);
+
+    --text: #E5ECE9;
+    --text-dim: #7A8B88;
+    --text-muted: #4F5E5C;
+
+    --success: #5FAE7C;
+    --success-bg: rgba(95, 174, 124, 0.1);
+    --error: #C9614B;
+    --error-bg: rgba(201, 97, 75, 0.1);
+    --warn: #D0A24C;
+    --warn-bg: rgba(208, 162, 76, 0.1);
+    --info: #5B9BB8;
+    --info-bg: rgba(91, 155, 184, 0.1);
+
+    --card-shadow: 0 4px 20px -2px rgba(0, 0, 0, 0.5);
+  }
+}
+
+/* Base Body Styles */
+body {
+  background-color: var(--bg);
+  color: var(--text);
+  font-family: var(--font-body);
+  margin: 0;
+  padding: 0;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* App Sidebar (Permanent Sleek Dark) */
+.app-sidebar {
+  background-color: #10161A !important;
+  color: #E5ECE9 !important;
+  border-right: 1px solid #232D30 !important;
+}
+
+/* Sidebar Options Scrollbar */
+.custom-sidebar-scroll::-webkit-scrollbar {
+  width: 4px;
+}
+.custom-sidebar-scroll::-webkit-scrollbar-track {
+  background: transparent;
+}
+.custom-sidebar-scroll::-webkit-scrollbar-thumb {
+  background: #232D30;
+  border-radius: 2px;
+}
+.custom-sidebar-scroll::-webkit-scrollbar-thumb:hover {
+  background: var(--brass);
+}
+
+/* Custom Scrollbars */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: var(--bg);
+}
+::-webkit-scrollbar-thumb {
+  background: var(--border-light);
+  border-radius: 3px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--brass);
+}
+
+/* Typography Utility Classes */
+.font-display {
+  font-family: var(--font-display);
+}
+.font-mono {
+  font-family: var(--font-mono);
+}
+.font-body {
+  font-family: var(--font-body);
+}
+
+/* UI Surfaces */
+.surface-card {
+  background-color: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  box-shadow: var(--card-shadow);
+}
+
+.surface-panel {
+  background-color: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+}
+
+/* Buttons */
+.btn-brass {
+  background-color: var(--brass);
+  color: #FFFFFF;
+  font-weight: 500;
+  transition: all 0.2s ease;
+}
+.btn-brass:hover {
+  background-color: var(--brass-hover);
+  box-shadow: 0 0 12px var(--brass-glow);
+}
+
+.btn-surface {
+  background-color: var(--surface-2);
+  color: var(--text);
+  border: 1px solid var(--border);
+  transition: all 0.2s ease;
+}
+.btn-surface:hover {
+  background-color: var(--surface-3);
+  border-color: var(--border-light);
+}
+
+/* Form Controls & Dropdowns */
+select option, select optgroup {
+  background-color: var(--surface);
+  color: var(--text);
+  font-family: var(--font-body), sans-serif;
+}
+select optgroup {
+  font-weight: 700;
+  color: var(--brass);
+  background-color: var(--surface-2);
+}
+
+/* Badges */
+.badge-success {
+  background-color: var(--success-bg);
+  color: var(--success);
+  border: 1px solid rgba(95, 174, 124, 0.25);
+}
+.badge-warn {
+  background-color: var(--warn-bg);
+  color: var(--warn);
+  border: 1px solid rgba(208, 162, 76, 0.25);
+}
+.badge-error {
+  background-color: var(--error-bg);
+  color: var(--error);
+  border: 1px solid rgba(201, 97, 75, 0.25);
+}
+.badge-brass {
+  background-color: var(--brass-dim);
+  color: var(--brass);
+  border: 1px solid rgba(201, 138, 75, 0.25);
+}
+.badge-neutral {
+  background-color: var(--surface-2);
+  color: var(--text-dim);
+  border: 1px solid var(--border);
+}
+
+/* Data Table */
+.data-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.875rem;
+}
+.data-table th {
+  padding: 12px 16px;
+  text-align: left;
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-dim);
+  border-bottom: 1px solid var(--border);
+  background-color: var(--surface-2);
+  white-space: nowrap;
+  vertical-align: middle;
+}
+.data-table td {
+  padding: 13px 16px;
+  border-bottom: 1px solid var(--border);
+  color: var(--text);
+  vertical-align: middle;
+}
+.data-table tr:hover td {
+  background-color: var(--surface-2);
+}
+
+/* Sonner Toast High-Contrast Text */
+[data-sonner-toast] {
+  color: #FFFFFF !important;
+  font-family: var(--font-body), sans-serif !important;
+}
+[data-sonner-toast] [data-title] {
+  color: #FFFFFF !important;
+  font-weight: 600 !important;
+}
+[data-sonner-toast] [data-description] {
+  color: #D1DCD8 !important;
+}
+[data-sonner-toast] [data-close-button] {
+  color: #D1DCD8 !important;
+  border-color: #324145 !important;
+}
+
