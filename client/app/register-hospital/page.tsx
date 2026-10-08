@@ -214,6 +214,13 @@ export default function RegisterHospitalPage() {
         err.response?.data?.details?.[0]?.message ||
         err.response?.data?.error ||
         'Registration failed. Please check form details.';
+      if (errMsg.includes('Full Name already exists')) {
+        setConflicts((prev) => ({ ...prev, name: 'Hospital / Clinic Full Name already exists' }));
+        setCurrentStep(1);
+      } else if (errMsg.includes('Short Name already exists')) {
+        setConflicts((prev) => ({ ...prev, shortName: 'Hospital Short Name already exists' }));
+        setCurrentStep(1);
+      }
       toast.error(errMsg);
     } finally {
       setLoading(false);
@@ -394,7 +401,7 @@ export default function RegisterHospitalPage() {
 
               <div>
                 <label className="block text-xs font-mono text-[var(--text-dim)] uppercase tracking-wider mb-1.5">
-                  Hospital Short Name (For Topbar & Badges) *
+                  Hospital Short Name (For Topbar, Badges, staffs&apos; email Id prefix) *
                 </label>
                 <input
                   type="text"
@@ -411,10 +418,14 @@ export default function RegisterHospitalPage() {
                     <AlertCircle className="w-3.5 h-3.5" /> {conflicts.shortName}
                   </span>
                 ) : shortName ? (
-                  <div className="mt-2 flex items-center gap-2 p-2 bg-[var(--surface-2)] rounded border border-[var(--border)] text-xs font-mono text-[var(--text-dim)]">
+                  <div className="mt-2 flex flex-wrap items-center gap-2 p-2 bg-[var(--surface-2)] rounded border border-[var(--border)] text-xs font-mono text-[var(--text-dim)]">
                     <span>Generated Avatar Initials:</span>
                     <strong className="px-2 py-0.5 bg-[var(--brass)] text-white rounded font-bold">
                       {initials}
+                    </strong>
+                    <span className="ml-2">Staff Email Prefix:</span>
+                    <strong className="px-2 py-0.5 bg-[var(--surface-3)] text-[var(--brass)] rounded font-bold border border-[var(--border)]">
+                      {shortName.trim().toLowerCase().replace(/[^a-z0-9]/g, '')}.
                     </strong>
                   </div>
                 ) : null}

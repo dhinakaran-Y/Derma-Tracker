@@ -19,11 +19,31 @@ router.use(authMiddleware, adminOnly, auditMiddleware('admin'));
 
 // ==================== STAFF MANAGEMENT ====================
 
+const checkEmailSchema = z.object({
+  email: z.string().optional(),
+});
+
+router.get('/check-email', async (req: AuthRequest, res: Response) => {
+  const email = (req.query.email as string)?.trim().toLowerCase();
+  if (!email) return res.json({ success: true, exists: false });
+
+  const { Hospital } = await import('../models/Hospital');
+  const [existingUser, existingHosp] = await Promise.all([
+    User.findOne({ email }),
+    Hospital.findOne({ email }),
+  ]);
+
+  res.json({
+    success: true,
+    exists: !!(existingUser || existingHosp),
+  });
+});
+
 const createStaffSchema = z.object({
-  username: z.string().min(3),
+  username: z.string().optional(),
   password: z.string().min(6),
   fullName: z.string().min(1),
-  email: z.string().email().optional().or(z.literal('')),
+  email: z.string().email('Please enter a valid email address'),
   role: z.enum(['Admin', 'Receptionist', 'Doctor', 'MedicationGiver', 'StockManager']),
   specialization: z.string().optional().or(z.literal('')),
   consultFee: z.number().optional(),
@@ -31,17 +51,43 @@ const createStaffSchema = z.object({
 });
 
 router.post('/staff', validate(createStaffSchema), async (req: AuthRequest, res: Response) => {
-  const existing = await User.findOne({ username: req.body.username });
-  if (existing) throw new AppError('Username already taken', 409, 'DUPLICATE_USERNAME');
+  const { Hospital } = await import('../models/Hospital');
+  const cleanEmail = req.body.email.trim().toLowerCase();
+
+  // Validate unique email across Users and Hospitals
+  const [existingUser, existingHosp] = await Promise.all([
+    User.findOne({ email: cleanEmail }),
+    Hospital.findOne({ email: cleanEmail }),
+  ]);
+
+  if (existingUser || existingHosp) {
+    throw new AppError('this email id is already exists', 409, 'DUPLICATE_EMAIL');
+  }
+
+  // Ensure unique username
+  let baseUsername = (req.body.username || cleanEmail.split('@')[0])
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9_]/g, '');
+
+  if (!baseUsername) baseUsername = 'staff';
+
+  let finalUsername = baseUsername;
+  let count = 1;
+  while (await User.findOne({ username: finalUsername })) {
+    finalUsername = `${baseUsername}${count++}`;
+  }
 
   const user = await User.create({
     ...req.body,
+    username: finalUsername,
+    email: cleanEmail,
     hospitalId: req.user?.hospitalId,
     passwordHash: req.body.password, // pre-save hook hashes it
   });
 
   res.locals.auditDescription = `Created new staff account: ${user.fullName} (${user.role})`;
-  res.locals.auditDetails = { fullName: user.fullName, role: user.role, username: user.username };
+  res.locals.auditDetails = { fullName: user.fullName, role: user.role, username: user.username, email: user.email };
 
   res.status(201).json({ success: true, data: user.toJSON() });
 });
@@ -80,6 +126,15 @@ router.patch('/staff/:id', validate(updateStaffSchema), async (req: AuthRequest,
   if (req.user?.hospitalId) {
     filter.hospitalId = req.user.hospitalId;
   }
+
+  if (req.body.email?.trim()) {
+    const cleanEmail = req.body.email.trim().toLowerCase();
+    const existing = await User.findOne({ email: cleanEmail, _id: { $ne: req.params.id } });
+    if (existing) {
+      throw new AppError('this email id is already exists', 409, 'DUPLICATE_EMAIL');
+    }
+  }
+
   const user = await User.findOneAndUpdate(filter, req.body, { new: true, runValidators: true });
   if (!user) throw new AppError('Staff not found', 404, 'NOT_FOUND');
   res.locals.auditDescription = `Updated staff profile details for ${user.fullName} (${user.role})`;
@@ -148,23 +203,28 @@ router.get('/doctors', async (req: AuthRequest, res: Response) => {
 
 router.get('/settings', async (req: AuthRequest, res: Response) => {
   const settings = await getClinicSettings();
+  const { Hospital } = await import('../models/Hospital');
+  let hospital = null;
   if (req.user?.hospitalId) {
-    const { Hospital } = await import('../models/Hospital');
-    const hospital = await Hospital.findById(req.user.hospitalId);
-    if (hospital) {
-      return res.json({
-        success: true,
-        data: {
-          ...settings.toJSON(),
-          clinicName: hospital.name,
-          address: hospital.address || settings.address,
-          phone: hospital.phone || settings.phone,
-          email: hospital.email || settings.email,
-          gstNumber: hospital.gstNumber || settings.gstNumber,
-          registrationFee: hospital.registrationFee !== undefined ? hospital.registrationFee : (settings.registrationFee || 0),
-        },
-      });
-    }
+    hospital = await Hospital.findById(req.user.hospitalId);
+  }
+  if (!hospital) {
+    hospital = await Hospital.findOne({ status: 'Active' });
+  }
+  if (hospital) {
+    return res.json({
+      success: true,
+      data: {
+        ...settings.toJSON(),
+        clinicName: hospital.name,
+        shortName: hospital.shortName,
+        address: hospital.address || settings.address,
+        phone: hospital.phone || settings.phone,
+        email: hospital.email || settings.email,
+        gstNumber: hospital.gstNumber || settings.gstNumber,
+        registrationFee: hospital.registrationFee !== undefined ? hospital.registrationFee : (settings.registrationFee || 0),
+      },
+    });
   }
   res.json({ success: true, data: settings });
 });

@@ -68,8 +68,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     refreshUser();
   }, [refreshUser]);
 
-  const loginStaff = async (username: string, password: string) => {
-    const res = await api.post('/auth/staff/login', { username, password });
+  const loginStaff = async (email: string, password: string) => {
+    const res = await api.post('/auth/staff/login', { email, username: email, password });
     const { user: userData, hospital: hospitalData, token } = res.data.data;
     if (token) localStorage.setItem('token', token);
     setUser(userData);

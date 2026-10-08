@@ -61,12 +61,12 @@ router.post('/validate-uniqueness', validate(uniquenessSchema), async (req: any,
 
   if (name?.trim()) {
     const existing = await Hospital.findOne({ name: { $regex: `^${name.trim()}$`, $options: 'i' } });
-    if (existing) conflicts.name = 'A hospital or clinic with this full name is already registered';
+    if (existing) conflicts.name = 'Hospital / Clinic Full Name already exists';
   }
 
   if (shortName?.trim()) {
     const existing = await Hospital.findOne({ shortName: { $regex: `^${shortName.trim()}$`, $options: 'i' } });
-    if (existing) conflicts.shortName = 'A hospital or clinic with this short name is already registered';
+    if (existing) conflicts.shortName = 'Hospital Short Name already exists';
   }
 
   if (email?.trim()) {
@@ -141,8 +141,8 @@ router.post('/register', validate(registerHospitalSchema), async (req: any, res:
     User.findOne({ email: cleanEmail }),
   ]);
 
-  if (existingName) throw new AppError('Hospital full name already exists', 409, 'DUPLICATE_NAME');
-  if (existingShortName) throw new AppError('Hospital short name already exists', 409, 'DUPLICATE_SHORT_NAME');
+  if (existingName) throw new AppError('Hospital / Clinic Full Name already exists', 409, 'DUPLICATE_NAME');
+  if (existingShortName) throw new AppError('Hospital Short Name already exists', 409, 'DUPLICATE_SHORT_NAME');
   if (existingEmail || existingUserEmail) throw new AppError('Email address already registered', 409, 'DUPLICATE_EMAIL');
 
   if (websiteUrl?.trim()) {

@@ -22,32 +22,34 @@ const COOKIE_OPTIONS = {
   path: '/',
 };
 
-// --- Staff Login ---
+// --- Staff Login (Email and Password only) ---
 const loginSchema = z.object({
-  username: z.string().min(1),
-  password: z.string().min(1),
+  email: z.string().optional(),
+  username: z.string().optional(),
+  password: z.string().min(1, 'Password is required'),
+}).refine((data) => !!(data.email || data.username), {
+  message: 'Email is required',
+  path: ['email'],
 });
 
 router.post('/staff/login', loginLimiter, validate(loginSchema), async (req: AuthRequest, res: Response) => {
-  const { username, password } = req.body;
-  const cleanIdentifier = username.trim();
-  const escaped = cleanIdentifier.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const { email, username, password } = req.body;
+  const emailInput = (email || username || '').trim().toLowerCase();
+  const escaped = emailInput.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
-  console.log(`\n🔑 [AUTH] Login attempt for identifier: "${cleanIdentifier}"`);
+  console.log(`\n🔑 [AUTH] Staff login attempt for email: "${emailInput}"`);
 
+  // Admin, doctor, staff can ONLY login by email and password
   const user = await User.findOne({
-    $or: [
-      { username: { $regex: new RegExp(`^${escaped}$`, 'i') } },
-      { email: { $regex: new RegExp(`^${escaped}$`, 'i') } },
-    ],
+    email: { $regex: new RegExp(`^${escaped}$`, 'i') },
     status: 'Active',
   });
 
   if (!user) {
-    console.warn(`❌ [AUTH] No active user found matching "${cleanIdentifier}"`);
+    console.warn(`❌ [AUTH] No active user found matching email "${emailInput}"`);
     throw new AppError(
       env.NODE_ENV === 'development'
-        ? `No account found with username or email "${cleanIdentifier}"`
+        ? `No account found with email "${emailInput}"`
         : 'Invalid credentials',
       401,
       'INVALID_CREDENTIALS'

@@ -34,6 +34,7 @@ import {
   CheckCircle,
   AlertOctagon,
   AlertTriangle,
+  AlertCircle,
   UserCheck,
   Eye,
   EyeOff,
@@ -123,7 +124,7 @@ function WhatsAppIntegrationCard() {
 }
 
 export default function AdminPage() {
-  const { user: currentUser } = useAuth();
+  const { user: currentUser, hospital } = useAuth();
   const [activeTab, setActiveTab] = useState('overview');
   const [staff, setStaff] = useState<User[]>([]);
   const [doctors, setDoctors] = useState<User[]>([]);
@@ -137,6 +138,10 @@ export default function AdminPage() {
   const [reportsSummary, setReportsSummary] = useState<any>(null);
   const [loading, setLoading] = useState(true);
 
+  // Hospital short name prefix for staff email creation
+  const hospitalShortName = hospital?.shortName || (clinicSettings as any)?.shortName || 'staff';
+  const cleanPrefixStr = (hospitalShortName.trim().toLowerCase().replace(/[^a-z0-9]/g, '') || 'staff') + '.';
+
   // Billing / Revenue tab state
   const [billingFilter, setBillingFilter] = useState<'all' | 'today' | 'yesterday' | 'last_week' | 'last_month' | 'specific_date'>('all');
   const [billingSpecificDate, setBillingSpecificDate] = useState('');
@@ -145,11 +150,13 @@ export default function AdminPage() {
   // Staff Management State
   const [showAddStaffModal, setShowAddStaffModal] = useState(false);
   const [showStaffPassword, setShowStaffPassword] = useState(false);
+  const [emailError, setEmailError] = useState<string | null>(null);
+  const [editEmailError, setEditEmailError] = useState<string | null>(null);
   const [newStaff, setNewStaff] = useState({
     username: '',
     password: '',
     fullName: '',
-    email: '',
+    email: cleanPrefixStr,
     role: 'Doctor' as any,
     specialization: '',
     consultFee: 500,
@@ -207,16 +214,118 @@ export default function AdminPage() {
     fetchAdminData();
   }, [fetchAdminData]);
 
+  const handleOpenAddStaffModal = (role: any = 'Doctor') => {
+    setEmailError(null);
+    setNewStaff({
+      username: '',
+      password: '',
+      fullName: '',
+      email: cleanPrefixStr,
+      role,
+      specialization: '',
+      consultFee: 500,
+    });
+    setShowAddStaffModal(true);
+  };
+
+  const handleStaffEmailChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    let val = e.target.value.toLowerCase();
+    if (!val.startsWith(cleanPrefixStr)) {
+      if (val.length < cleanPrefixStr.length) {
+        val = cleanPrefixStr;
+      } else {
+        val = cleanPrefixStr + val.replace(new RegExp(`^${cleanPrefixStr.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}?`), '');
+      }
+    }
+    setNewStaff((prev) => ({ ...prev, email: val }));
+    if (emailError) setEmailError(null);
+
+    const trimmed = val.trim();
+    if (trimmed !== cleanPrefixStr && staff.some((s) => s.email?.toLowerCase() === trimmed)) {
+      setEmailError('this email id is already exists');
+    }
+  };
+
+  const handleStaffEmailKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    try {
+      const target = e.currentTarget;
+      const selStart = target.selectionStart ?? 0;
+      const selEnd = target.selectionEnd ?? 0;
+
+      // Prevent erasing the prefix
+      if (e.key === 'Backspace' && selStart <= cleanPrefixStr.length && selEnd <= cleanPrefixStr.length) {
+        e.preventDefault();
+      }
+      if (e.key === 'Delete' && selStart < cleanPrefixStr.length) {
+        e.preventDefault();
+      }
+    } catch {
+      // Ignore if selection is not supported
+    }
+  };
+
+  const handleStaffEmailSelectOrClick = (e: React.SyntheticEvent<HTMLInputElement>) => {
+    try {
+      const target = e.currentTarget;
+      if (target.selectionStart !== null && target.selectionStart < cleanPrefixStr.length) {
+        target.setSelectionRange(cleanPrefixStr.length, Math.max(cleanPrefixStr.length, target.selectionEnd ?? cleanPrefixStr.length));
+      }
+    } catch {
+      // Ignore if selection is not supported
+    }
+  };
+
+  const handleStaffEmailBlur = async () => {
+    const trimmed = newStaff.email.trim();
+    if (!trimmed || trimmed === cleanPrefixStr) {
+      setEmailError('Email address is mandatory');
+      return;
+    }
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(trimmed)) {
+      setEmailError(`Please enter a valid email address (e.g. ${cleanPrefixStr}suresh@gmail.com)`);
+      return;
+    }
+    if (staff.some((s) => s.email?.toLowerCase() === trimmed)) {
+      setEmailError('this email id is already exists');
+      return;
+    }
+    try {
+      const res = await api.get('/admin/check-email', { params: { email: trimmed } });
+      if (res.data?.exists) {
+        setEmailError('this email id is already exists');
+      } else {
+        setEmailError(null);
+      }
+    } catch {
+      // Ignore network error on blur check
+    }
+  };
+
   const handleCreateStaff = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
+      const trimmedEmail = newStaff.email.trim().toLowerCase();
+      if (!trimmedEmail || trimmedEmail === cleanPrefixStr) {
+        setEmailError('Email address is mandatory');
+        return;
+      }
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (!emailRegex.test(trimmedEmail)) {
+        setEmailError(`Please enter a valid email address (e.g. ${cleanPrefixStr}suresh@gmail.com)`);
+        return;
+      }
+      if (emailError) {
+        return;
+      }
+
       const payload: any = {
-        username: newStaff.username.trim(),
         password: newStaff.password,
         fullName: newStaff.fullName.trim(),
         role: newStaff.role,
+        email: trimmedEmail,
       };
-      if (newStaff.email?.trim()) payload.email = newStaff.email.trim();
+      if (newStaff.username?.trim()) payload.username = newStaff.username.trim();
       if (newStaff.specialization?.trim()) payload.specialization = newStaff.specialization.trim();
       if (newStaff.role === 'Doctor') {
         payload.consultFee = Number(newStaff.consultFee) || 500;
@@ -225,11 +334,12 @@ export default function AdminPage() {
       await api.post('/admin/staff', payload);
       toast.success(`Staff account created for ${newStaff.fullName}`);
       setShowAddStaffModal(false);
+      setEmailError(null);
       setNewStaff({
         username: '',
         password: '',
         fullName: '',
-        email: '',
+        email: cleanPrefixStr,
         role: 'Doctor',
         specialization: '',
         consultFee: 500,
@@ -237,7 +347,15 @@ export default function AdminPage() {
       fetchAdminData();
     } catch (err: any) {
       const errMsg = err.response?.data?.details?.[0]?.message || err.response?.data?.error || 'Failed to create staff account';
-      toast.error(errMsg);
+      if (
+        err.response?.status === 409 ||
+        err.response?.data?.code === 'DUPLICATE_EMAIL' ||
+        errMsg.toLowerCase().includes('already exists')
+      ) {
+        setEmailError('this email id is already exists');
+      } else {
+        toast.error(errMsg);
+      }
     }
   };
 
@@ -325,10 +443,11 @@ export default function AdminPage() {
   const handleUpdateStaff = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!editingStaff) return;
+    setEditEmailError(null);
     try {
       await api.patch(`/admin/staff/${editingStaff._id}`, {
         fullName: editingStaff.fullName,
-        email: editingStaff.email,
+        email: editingStaff.email?.trim().toLowerCase(),
         role: editingStaff.role,
         specialization: editingStaff.specialization,
         consultFee: editingStaff.consultFee,
@@ -343,9 +462,19 @@ export default function AdminPage() {
       toast.success(`Updated profile & role for ${editingStaff.fullName}`);
       setEditingStaff(null);
       setEditStaffPassword('');
+      setEditEmailError(null);
       fetchAdminData();
     } catch (err: any) {
-      toast.error(err.response?.data?.error || err.response?.data?.message || 'Failed to update staff');
+      const errMsg = err.response?.data?.details?.[0]?.message || err.response?.data?.error || err.response?.data?.message || 'Failed to update staff';
+      if (
+        err.response?.status === 409 ||
+        err.response?.data?.code === 'DUPLICATE_EMAIL' ||
+        errMsg.toLowerCase().includes('already exists')
+      ) {
+        setEditEmailError('this email id is already exists');
+      } else {
+        toast.error(errMsg);
+      }
     }
   };
 
@@ -485,7 +614,7 @@ export default function AdminPage() {
       pageTitle="Administrator & Operations Console"
       topbarActions={
         <button
-          onClick={() => setShowAddStaffModal(true)}
+          onClick={() => handleOpenAddStaffModal()}
           className="btn-brass px-3 py-1.5 rounded text-xs font-mono font-medium flex items-center gap-1"
         >
           <Plus className="w-3.5 h-3.5" />
@@ -862,10 +991,7 @@ export default function AdminPage() {
                 </p>
                 <button
                   type="button"
-                  onClick={() => {
-                    setNewStaff((prev) => ({ ...prev, role: 'Doctor' }));
-                    setShowAddStaffModal(true);
-                  }}
+                  onClick={() => handleOpenAddStaffModal('Doctor')}
                   className="btn-brass px-3.5 py-1.5 rounded text-xs font-mono font-medium flex items-center gap-1.5 mt-2"
                 >
                   <Plus className="w-3.5 h-3.5" />
@@ -2043,12 +2169,11 @@ export default function AdminPage() {
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="block text-xs font-mono text-[var(--text-dim)] uppercase tracking-wider mb-1">
-                    Username *
+                    Username (Optional)
                   </label>
                   <input
                     type="text"
-                    required
-                    placeholder="dr.rajesh"
+                    placeholder="auto-derived if empty"
                     value={newStaff.username}
                     onChange={(e) => setNewStaff({ ...newStaff, username: e.target.value })}
                     className="w-full px-3 py-2 text-sm bg-[var(--surface-2)] border border-[var(--border)] rounded text-[var(--text)] font-mono"
@@ -2085,16 +2210,39 @@ export default function AdminPage() {
               </div>
 
               <div>
-                <label className="block text-xs font-mono text-[var(--text-dim)] uppercase tracking-wider mb-1">
-                  Email Address (Optional)
-                </label>
+                <div className="flex items-center justify-between mb-1">
+                  <label className="block text-xs font-mono text-[var(--text-dim)] uppercase tracking-wider">
+                    Email Address *
+                  </label>
+                  <span className="text-[10px] font-mono text-[var(--brass)] bg-[var(--brass)]/10 px-1.5 py-0.5 rounded border border-[var(--brass)]/20">
+                    Prefix locked: {cleanPrefixStr}
+                  </span>
+                </div>
                 <input
-                  type="email"
-                  placeholder="doctor@hospital.com"
+                  type="text"
+                  inputMode="email"
+                  autoComplete="email"
+                  required
+                  placeholder={`${cleanPrefixStr}suresh@gmail.com`}
                   value={newStaff.email}
-                  onChange={(e) => setNewStaff({ ...newStaff, email: e.target.value })}
-                  className="w-full px-3 py-2 text-sm bg-[var(--surface-2)] border border-[var(--border)] rounded text-[var(--text)] font-mono focus:outline-none focus:border-[var(--brass)]"
+                  onChange={handleStaffEmailChange}
+                  onKeyDown={handleStaffEmailKeyDown}
+                  onClick={handleStaffEmailSelectOrClick}
+                  onSelect={handleStaffEmailSelectOrClick}
+                  onBlur={handleStaffEmailBlur}
+                  className={`w-full px-3 py-2 text-sm bg-[var(--surface-2)] border rounded text-[var(--text)] font-mono focus:outline-none ${
+                    emailError ? 'border-[var(--error)] focus:border-[var(--error)]' : 'border-[var(--border)] focus:border-[var(--brass)]'
+                  }`}
                 />
+                {emailError ? (
+                  <p className="text-xs text-[var(--error)] flex items-center gap-1 mt-1 font-mono">
+                    <AlertCircle className="w-3.5 h-3.5 flex-shrink-0" /> {emailError}
+                  </p>
+                ) : (
+                  <p className="text-[11px] text-[var(--text-dim)] mt-1 font-mono">
+                    e.g. {cleanPrefixStr}suresh@gmail.com, {cleanPrefixStr}kavi@gmail.com
+                  </p>
+                )}
               </div>
 
               <div>
@@ -2174,7 +2322,10 @@ export default function AdminPage() {
                 Edit Staff Account: {editingStaff.fullName}
               </h3>
               <button
-                onClick={() => setEditingStaff(null)}
+                onClick={() => {
+                  setEditingStaff(null);
+                  setEditEmailError(null);
+                }}
                 className="text-[var(--text-dim)] hover:text-[var(--text)] font-mono text-sm"
               >
                 ✕
@@ -2227,14 +2378,25 @@ export default function AdminPage() {
 
               <div>
                 <label className="block text-xs font-mono text-[var(--text-dim)] uppercase tracking-wider mb-1">
-                  Email Address
+                  Email Address *
                 </label>
                 <input
                   type="email"
+                  required
                   value={editingStaff.email || ''}
-                  onChange={(e) => setEditingStaff({ ...editingStaff, email: e.target.value })}
-                  className="w-full px-3 py-2 text-sm bg-[var(--surface-2)] border border-[var(--border)] rounded text-[var(--text)] font-mono"
+                  onChange={(e) => {
+                    setEditingStaff({ ...editingStaff, email: e.target.value });
+                    if (editEmailError) setEditEmailError(null);
+                  }}
+                  className={`w-full px-3 py-2 text-sm bg-[var(--surface-2)] border rounded text-[var(--text)] font-mono focus:outline-none ${
+                    editEmailError ? 'border-[var(--error)] focus:border-[var(--error)]' : 'border-[var(--border)] focus:border-[var(--brass)]'
+                  }`}
                 />
+                {editEmailError && (
+                  <p className="text-xs text-[var(--error)] flex items-center gap-1 mt-1 font-mono">
+                    <AlertCircle className="w-3.5 h-3.5 flex-shrink-0" /> {editEmailError}
+                  </p>
+                )}
               </div>
 
               {editingStaff.role === 'Doctor' && (
@@ -2283,7 +2445,10 @@ export default function AdminPage() {
               <div className="flex gap-2 pt-3">
                 <button
                   type="button"
-                  onClick={() => setEditingStaff(null)}
+                  onClick={() => {
+                    setEditingStaff(null);
+                    setEditEmailError(null);
+                  }}
                   className="flex-1 btn-surface py-2 rounded text-xs font-mono"
                 >
                   Cancel

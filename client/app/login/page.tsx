@@ -5,7 +5,7 @@ import { useAuth } from '../../hooks/useAuth';
 import { useTheme } from '../../hooks/useTheme';
 import { toast } from 'sonner';
 import Link from 'next/link';
-import { Shield, ArrowRight, Sun, Moon, CheckCircle2, Lock, Building2, Eye, EyeOff, Smartphone, Phone } from 'lucide-react';
+import { Shield, ArrowRight, Sun, Moon, CheckCircle2, Lock, Building2, Eye, EyeOff, Smartphone, Phone, Mail } from 'lucide-react';
 import { RockerToggle } from '../../components/RockerToggle';
 import { api } from '../../lib/api';
 
@@ -15,8 +15,8 @@ export default function LoginPage() {
 
   const [authMode, setAuthMode] = useState<'staff' | 'patient'>('staff');
 
-  // Staff Form
-  const [username, setUsername] = useState('');
+  // Staff Form (Email & Password only)
+  const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [staffLoading, setStaffLoading] = useState(false);
@@ -51,13 +51,13 @@ export default function LoginPage() {
 
   const handleStaffSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!username || !password) {
-      toast.error('Please enter username and password');
+    if (!email || !password) {
+      toast.error('Please enter email and password');
       return;
     }
     setStaffLoading(true);
     try {
-      await loginStaff(username, password);
+      await loginStaff(email.trim(), password);
       toast.success('Logged in successfully');
     } catch (err: any) {
       toast.error(err.response?.data?.error || 'Invalid credentials');
@@ -155,8 +155,8 @@ export default function LoginPage() {
     }
   };
 
-  const quickFillStaff = (u: string, p: string) => {
-    setUsername(u);
+  const quickFillStaff = (e: string, p: string) => {
+    setEmail(e);
     setPassword(p);
   };
 
@@ -211,16 +211,16 @@ export default function LoginPage() {
           <form onSubmit={handleStaffSubmit} className="space-y-4">
             <div>
               <label className="block text-xs font-mono text-[var(--text-dim)] uppercase tracking-wider mb-1.5">
-                Username or Admin Email
+                Staff / Admin Email Address
               </label>
               <div className="relative">
-                <Shield className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-[var(--text-dim)]" />
+                <Mail className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-[var(--text-dim)]" />
                 <input
-                  type="text"
+                  type="email"
                   required
-                  placeholder="admin, dr.ananya, admin@clinic.com..."
-                  value={username}
-                  onChange={(e) => setUsername(e.target.value)}
+                  placeholder="admin@clinic.com, dr.ananya@clinic.com..."
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
                   className="w-full pl-9 pr-3 py-2 text-sm bg-[var(--surface-2)] border border-[var(--border)] rounded-md text-[var(--text)] focus:outline-none focus:border-[var(--brass)] font-mono"
                 />
               </div>
@@ -273,35 +273,35 @@ export default function LoginPage() {
               <div className="flex flex-wrap gap-1.5 justify-center">
                 <button
                   type="button"
-                  onClick={() => quickFillStaff('admin', 'admin123')}
+                  onClick={() => quickFillStaff('priya.admin@dermatrack.clinic', 'admin123')}
                   className="text-[11px] font-mono px-2 py-1 bg-[var(--surface-2)] hover:bg-[var(--surface-3)] border border-[var(--border)] rounded text-[var(--text-dim)] hover:text-[var(--brass)]"
                 >
                   Admin
                 </button>
                 <button
                   type="button"
-                  onClick={() => quickFillStaff('dr.ananya', 'doctor123')}
+                  onClick={() => quickFillStaff('ananya.sharma@dermatrack.clinic', 'doctor123')}
                   className="text-[11px] font-mono px-2 py-1 bg-[var(--surface-2)] hover:bg-[var(--surface-3)] border border-[var(--border)] rounded text-[var(--text-dim)] hover:text-[var(--brass)]"
                 >
                   Doctor
                 </button>
                 <button
                   type="button"
-                  onClick={() => quickFillStaff('receptionist', 'staff123')}
+                  onClick={() => quickFillStaff('kavitha.reception@dermatrack.clinic', 'staff123')}
                   className="text-[11px] font-mono px-2 py-1 bg-[var(--surface-2)] hover:bg-[var(--surface-3)] border border-[var(--border)] rounded text-[var(--text-dim)] hover:text-[var(--brass)]"
                 >
                   Receptionist
                 </button>
                 <button
                   type="button"
-                  onClick={() => quickFillStaff('medgiver', 'staff123')}
+                  onClick={() => quickFillStaff('suresh.pharma@dermatrack.clinic', 'staff123')}
                   className="text-[11px] font-mono px-2 py-1 bg-[var(--surface-2)] hover:bg-[var(--surface-3)] border border-[var(--border)] rounded text-[var(--text-dim)] hover:text-[var(--brass)]"
                 >
                   Pharmacy
                 </button>
                 <button
                   type="button"
-                  onClick={() => quickFillStaff('stockmanager', 'staff123')}
+                  onClick={() => quickFillStaff('ramesh.inventory@dermatrack.clinic', 'staff123')}
                   className="text-[11px] font-mono px-2 py-1 bg-[var(--surface-2)] hover:bg-[var(--surface-3)] border border-[var(--border)] rounded text-[var(--text-dim)] hover:text-[var(--brass)]"
                 >
                   Stock
