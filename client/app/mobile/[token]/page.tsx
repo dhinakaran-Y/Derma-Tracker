@@ -7,10 +7,11 @@ import { Camera, CheckCircle2, Check, AlertCircle, RefreshCw, Shield, Trash2, Us
 import { MobileCameraModal } from '@/components/MobileCameraModal';
 import { compressImage } from '@/lib/imageCompression';
 import { detectClientDeviceName } from '@/lib/deviceDetector';
+import { getApiBaseUrl } from '@/lib/api';
 
 // Unauthenticated API client for the public mobile page
 const mobileApi = axios.create({
-  baseURL: typeof window !== 'undefined' ? '/api' : 'http://localhost:5000/api',
+  baseURL: getApiBaseUrl(),
   timeout: 15000,
   withCredentials: true,
   headers: { 'Content-Type': 'application/json' },
@@ -19,6 +20,7 @@ const mobileApi = axios.create({
 // Automatically inject stored device secret header
 mobileApi.interceptors.request.use((config) => {
   if (typeof window !== 'undefined') {
+    config.baseURL = getApiBaseUrl();
     // Extract token from request URL if present: /device-pairing/:token/...
     const match = config.url?.match(/device-pairing\/([a-zA-Z0-9_-]+)/);
     const urlParts = window.location.pathname.split('/');

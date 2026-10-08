@@ -63,9 +63,8 @@ function WhatsAppIntegrationCard() {
 
   React.useEffect(() => {
     const check = () =>
-      fetch('/api/whatsapp/status')
-        .then((r) => r.json())
-        .then((d) => setWaStatus(d?.data ?? null))
+      api.get('/whatsapp/status')
+        .then((res) => setWaStatus(res.data?.data ?? null))
         .catch(() => {});
     check();
     const iv = setInterval(check, 5000);

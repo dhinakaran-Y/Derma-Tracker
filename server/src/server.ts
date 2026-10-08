@@ -54,36 +54,36 @@ app.use(express.json({
 }));
 app.use(express.urlencoded({ extended: true, limit: '25mb' }));
 
-// Root and Health Routes (e.g. http://localhost:5000/ and http://localhost:5000/health)
-app.use('/', healthRoutes);
+// API Router grouping all clinical ERP routes
+const apiRouter = express.Router();
+apiRouter.use(generalLimiter);
 
-// General Rate Limiting for API routes
-app.use('/api', generalLimiter);
+// Health check inside apiRouter
+apiRouter.use('/', healthRoutes);
 
-// API Routes
-app.use('/api', healthRoutes);
-app.use('/api/auth', authRoutes);
-app.use('/api/hospitals', hospitalRoutes);
-app.use('/api/admin', adminRoutes);
-app.use('/api/receptionist', receptionistRoutes);
-app.use('/api/doctor', doctorRoutes);
-app.use('/api/capture-sessions', captureSessionRoutes);
-app.use('/api/device-pairing', devicePairingRoutes);
-app.use('/api/tunnel', tunnelRoutes);
-app.use('/api/appointments', appointmentRoutes);
-app.use('/api/pharmacy', pharmacyRoutes);
-app.use('/api/stock', stockRoutes);
-app.use('/api/billing', billingRoutes);
-app.use('/api/client', clientRoutes);
-app.use('/api/uploads', uploadRoutes);
-app.use('/api/payment', paymentRoutes);
+// Clinical ERP Feature Routes
+apiRouter.use('/auth', authRoutes);
+apiRouter.use('/hospitals', hospitalRoutes);
+apiRouter.use('/admin', adminRoutes);
+apiRouter.use('/receptionist', receptionistRoutes);
+apiRouter.use('/doctor', doctorRoutes);
+apiRouter.use('/capture-sessions', captureSessionRoutes);
+apiRouter.use('/device-pairing', devicePairingRoutes);
+apiRouter.use('/tunnel', tunnelRoutes);
+apiRouter.use('/appointments', appointmentRoutes);
+apiRouter.use('/pharmacy', pharmacyRoutes);
+apiRouter.use('/stock', stockRoutes);
+apiRouter.use('/billing', billingRoutes);
+apiRouter.use('/client', clientRoutes);
+apiRouter.use('/uploads', uploadRoutes);
+apiRouter.use('/payment', paymentRoutes);
 
 // WhatsApp admin endpoints — status is public for UI feature flags; QR and reconnect require Admin role
-app.get('/api/whatsapp/status', (_req, res) => {
+apiRouter.get('/whatsapp/status', (_req, res) => {
   res.json({ success: true, data: getWhatsAppStatus() });
 });
 
-app.get('/api/whatsapp/qr', authMiddleware, adminOnly, async (_req, res) => {
+apiRouter.get('/whatsapp/qr', authMiddleware, adminOnly, async (_req, res) => {
   const dataUrl = await getWhatsAppQr();
   if (!dataUrl) {
     res.json({ success: false, reason: 'No QR available — already connected or WhatsApp not initialised' });
@@ -92,10 +92,17 @@ app.get('/api/whatsapp/qr', authMiddleware, adminOnly, async (_req, res) => {
   res.json({ success: true, qr: dataUrl });
 });
 
-app.post('/api/whatsapp/reconnect', authMiddleware, adminOnly, (_req, res) => {
+apiRouter.post('/whatsapp/reconnect', authMiddleware, adminOnly, (_req, res) => {
   triggerReconnect();
   res.json({ success: true, message: 'Reconnect triggered — check /api/whatsapp/status for QR in ~3s' });
 });
+
+// Root health check endpoint (e.g. http://localhost:5000/ and http://localhost:5000/health)
+app.use('/', healthRoutes);
+
+// Mount API routes at both /api (standard) and / (fallback for clients omitting /api prefix)
+app.use('/api', apiRouter);
+app.use('/', apiRouter);
 
 // Catch 404 & Global Error Handling
 app.use(notFound);

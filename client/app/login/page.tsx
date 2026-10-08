@@ -7,6 +7,7 @@ import { toast } from 'sonner';
 import Link from 'next/link';
 import { Shield, ArrowRight, Sun, Moon, CheckCircle2, Lock, Building2, Eye, EyeOff, Smartphone, Phone } from 'lucide-react';
 import { RockerToggle } from '../../components/RockerToggle';
+import { api } from '../../lib/api';
 
 export default function LoginPage() {
   const { loginStaff, sendPatientOtp, verifyPatientOtp, loading, user, patient, userType } = useAuth();
@@ -43,9 +44,8 @@ export default function LoginPage() {
 
   // OPT 4: Check WhatsApp availability on mount
   useEffect(() => {
-    fetch('/api/whatsapp/status')
-      .then((r) => r.json())
-      .then((d) => setWaAvailable(d?.data?.connected ?? false))
+    api.get('/whatsapp/status')
+      .then((res) => setWaAvailable(res.data?.data?.connected ?? false))
       .catch(() => setWaAvailable(false));
   }, []);
 

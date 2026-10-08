@@ -4,11 +4,19 @@ import React, { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import axios from 'axios';
 import { Smartphone, RefreshCw, QrCode, AlertCircle } from 'lucide-react';
+import { getApiBaseUrl } from '@/lib/api';
 
 const mobileApi = axios.create({
-  baseURL: typeof window !== 'undefined' ? '/api' : 'http://localhost:5000/api',
+  baseURL: getApiBaseUrl(),
   timeout: 10000,
   headers: { 'Content-Type': 'application/json' },
+});
+
+mobileApi.interceptors.request.use((config) => {
+  if (typeof window !== 'undefined') {
+    config.baseURL = getApiBaseUrl();
+  }
+  return config;
 });
 
 function getCookie(name: string): string | null {

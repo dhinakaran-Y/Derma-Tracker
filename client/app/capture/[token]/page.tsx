@@ -6,14 +6,22 @@ import axios from 'axios';
 import { Camera, CheckCircle2, AlertCircle, RefreshCw, Upload, Image as ImageIcon, Shield, Trash2 } from 'lucide-react';
 import { MobileCameraModal } from '@/components/MobileCameraModal';
 import { compressImage } from '@/lib/imageCompression';
+import { getApiBaseUrl } from '@/lib/api';
 
 // Dedicated unauthenticated API client for the public capture page.
 // This avoids using the main `api` instance which injects the doctor's JWT
 // from localStorage, causing spurious 401 errors in the browser console.
 const captureApi = axios.create({
-  baseURL: typeof window !== 'undefined' ? '/api' : 'http://localhost:5000/api',
+  baseURL: getApiBaseUrl(),
   timeout: 15000,
   headers: { 'Content-Type': 'application/json' },
+});
+
+captureApi.interceptors.request.use((config) => {
+  if (typeof window !== 'undefined') {
+    config.baseURL = getApiBaseUrl();
+  }
+  return config;
 });
 
 function getMediaUrl(path?: string): string {

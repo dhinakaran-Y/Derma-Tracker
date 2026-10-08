@@ -1,20 +1,35 @@
 import axios, { AxiosError } from 'axios';
 
+/**
+ * Normalizes any configured API URL to ensure it points to the API root.
+ * If provided without an '/api' suffix (e.g. 'https://derma-tracker.onrender.com'),
+ * it automatically appends '/api' so all endpoint routes (/auth/staff/login, /admin, etc.) resolve properly.
+ */
+export function normalizeApiUrl(url?: string): string {
+  if (!url) return '/api';
+  const trimmed = url.trim().replace(/\/+$/, '');
+  if (!trimmed) return '/api';
+  if (trimmed.endsWith('/api')) {
+    return trimmed;
+  }
+  return `${trimmed}/api`;
+}
+
 export function getApiBaseUrl(): string {
   if (typeof window !== 'undefined') {
     const envUrl = process.env.NEXT_PUBLIC_API_URL;
     if (envUrl && !envUrl.includes('localhost')) {
-      return envUrl;
+      return normalizeApiUrl(envUrl);
     }
     // In browser, using relative '/api' leverages Next.js proxy rewrite on port 3000
     // This eliminates CORS, port 5000 firewall/NAT blocking, and works seamlessly
     // on localhost, LAN IP (10.x.x.x, 192.168.x.x), and any public tunnel!
     return '/api';
   }
-  return process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api';
+  return normalizeApiUrl(process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000');
 }
 
-const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api';
+const API_BASE = normalizeApiUrl(process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000');
 
 /**
  * Configured Axios instance with credentials (httpOnly cookie)
@@ -124,16 +139,16 @@ export function getMediaUrl(path?: string): string {
   }
 
   // If explicit public server URL is configured
+  const fallbackServer = (process.env.NEXT_PUBLIC_SERVER_URL || process.env.NEXT_PUBLIC_API_URL?.replace(/\/api\/?$/, ''))?.replace(/\/+$/, '');
   if (typeof window !== 'undefined') {
-    const serverUrl = process.env.NEXT_PUBLIC_SERVER_URL;
-    if (serverUrl && !serverUrl.includes('localhost')) {
-      return `${serverUrl}${clean}`;
+    if (fallbackServer && !fallbackServer.includes('localhost')) {
+      return `${fallbackServer}${clean}`;
     }
     // In browser, relative `/api/uploads/...` routes through Next.js proxy rewrite seamlessly
     return clean;
   }
 
-  const serverUrl = process.env.NEXT_PUBLIC_SERVER_URL || 'http://localhost:5000';
+  const serverUrl = fallbackServer || 'http://localhost:5000';
   return `${serverUrl}${clean}`;
 }
 
