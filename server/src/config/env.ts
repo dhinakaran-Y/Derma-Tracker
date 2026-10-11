@@ -16,6 +16,7 @@ const envSchema = z.object({
   SMS_GATEWAY_URL: z.string().default('http://10.127.233.155:8080'),
   SMS_GATEWAY_USERNAME: z.string().default(''),
   SMS_GATEWAY_PASSWORD: z.string().default(''),
+  SMS_GATEWAY_DEVICE_ID: z.string().default(''),
   // WhatsApp via Baileys
   WHATSAPP_ENABLED: z.string().default('false'),
   // OTP: set to 'true' to always use 123456 for easy testing (overrides real OTP generation)
