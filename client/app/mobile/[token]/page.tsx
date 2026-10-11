@@ -3,7 +3,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useParams } from 'next/navigation';
 import axios from 'axios';
-import { Camera, CheckCircle2, Check, AlertCircle, RefreshCw, Shield, Trash2, User, Clock, Wifi, WifiOff, Smartphone, Image as ImageIcon } from 'lucide-react';
+import { Camera, CheckCircle2, Check, AlertCircle, RefreshCw, Shield, Trash2, User, Clock, Wifi, WifiOff, Smartphone, Image as ImageIcon, Eye, EyeOff } from 'lucide-react';
 import { MobileCameraModal } from '@/components/MobileCameraModal';
 import { compressImage } from '@/lib/imageCompression';
 import { detectClientDeviceName } from '@/lib/deviceDetector';
@@ -112,6 +112,7 @@ export default function MobilePairingPage() {
 
   // Auth state
   const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [verifyingPassword, setVerifyingPassword] = useState(false);
   const [passwordError, setPasswordError] = useState<string | null>(null);
   const [isVerified, setIsVerified] = useState(false);
@@ -147,6 +148,7 @@ export default function MobilePairingPage() {
   const [isRevoked, setIsRevoked] = useState(false);
 
   const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const nativeCameraInputRef = useRef<HTMLInputElement | null>(null);
   const pollIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   // ==================== Validate Pairing Token ====================
@@ -386,6 +388,12 @@ export default function MobilePairingPage() {
 
   const triggerCamera = () => {
     if (!uploading && activeVisit && activeVisit.count < activeVisit.maxImages) {
+      if (typeof navigator === 'undefined' || !navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+        if (nativeCameraInputRef.current) {
+          nativeCameraInputRef.current.click();
+          return;
+        }
+      }
       setCameraModalOpen(true);
     }
   };
@@ -489,6 +497,15 @@ export default function MobilePairingPage() {
                     type="text"
                     value={deviceDisplayName}
                     onChange={(e) => setDeviceDisplayName(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        e.preventDefault();
+                        setIsEditingDeviceName(false);
+                      } else if (e.key === 'Escape') {
+                        e.preventDefault();
+                        setIsEditingDeviceName(false);
+                      }
+                    }}
                     placeholder="e.g. Realme 7, Oppo A23"
                     className="text-xs font-bold text-white bg-slate-900 border border-teal-500 rounded px-2 py-0.5 mt-0.5 focus:outline-none w-full"
                     autoFocus
@@ -511,14 +528,25 @@ export default function MobilePairingPage() {
 
           <form onSubmit={handleVerifyPassword} className="space-y-3">
             <div>
-              <input
-                type="password"
-                value={password}
-                onChange={(e) => { setPassword(e.target.value); setPasswordError(null); }}
-                placeholder="Enter Doctor Password"
-                autoFocus
-                className="w-full px-4 py-3 rounded-xl bg-slate-800 border border-slate-700 text-white text-sm font-mono placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-teal-500 transition-all"
-              />
+              <div className="relative">
+                <input
+                  type={showPassword ? 'text' : 'password'}
+                  value={password}
+                  onChange={(e) => { setPassword(e.target.value); setPasswordError(null); }}
+                  placeholder="Enter Doctor Password"
+                  autoFocus
+                  className="w-full pl-4 pr-11 py-3 rounded-xl bg-slate-800 border border-slate-700 text-white text-sm font-mono placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-teal-500 transition-all"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-200 transition-colors p-1 cursor-pointer"
+                  title={showPassword ? 'Hide password' : 'Show password'}
+                  tabIndex={-1}
+                >
+                  {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                </button>
+              </div>
               {passwordError && (
                 <p className="mt-1.5 text-xs text-red-400 flex items-center gap-1">
                   <AlertCircle className="w-3 h-3" /> {passwordError}
@@ -575,11 +603,19 @@ export default function MobilePairingPage() {
         </div>
       </div>
 
-      {/* Hidden file input for gallery/file fallback (without capture="environment" to avoid OS memory crash) */}
+      {/* Hidden file inputs for gallery and native camera */}
       <input
         ref={fileInputRef}
         type="file"
         accept="image/*"
+        onChange={handleFileChange}
+        className="hidden"
+      />
+      <input
+        ref={nativeCameraInputRef}
+        type="file"
+        accept="image/*"
+        capture="environment"
         onChange={handleFileChange}
         className="hidden"
       />

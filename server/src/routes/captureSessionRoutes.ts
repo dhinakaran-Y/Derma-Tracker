@@ -30,9 +30,36 @@ function getLocalIp(): string {
   return 'localhost';
 }
 
-function getBaseClientUrl(customBaseUrl?: string): string {
+function isPublicHost(urlOrHost: string): boolean {
+  if (!urlOrHost) return false;
+  const lower = urlOrHost.toLowerCase();
+  return (
+    !lower.includes('localhost') &&
+    !lower.includes('127.0.0.1') &&
+    !lower.includes('10.') &&
+    !lower.includes('192.168.') &&
+    !lower.includes('0.0.0.0')
+  );
+}
+
+function getBaseClientUrl(customBaseUrl?: string, req?: Request): string {
   if (customBaseUrl && typeof customBaseUrl === 'string' && customBaseUrl.trim().startsWith('http')) {
     return customBaseUrl.trim().replace(/\/+$/, '');
+  }
+  if (req) {
+    try {
+      const originHeader = req.headers.origin;
+      if (typeof originHeader === 'string' && originHeader.startsWith('http') && isPublicHost(originHeader)) {
+        return originHeader.trim().replace(/\/+$/, '');
+      }
+      const refererHeader = req.headers.referer;
+      if (typeof refererHeader === 'string' && refererHeader.startsWith('http')) {
+        const parsed = new URL(refererHeader);
+        if (isPublicHost(parsed.host)) {
+          return parsed.origin.replace(/\/+$/, '');
+        }
+      }
+    } catch {}
   }
   if (process.env.PUBLIC_APP_URL) {
     return process.env.PUBLIC_APP_URL.replace(/\/+$/, '');
@@ -78,7 +105,7 @@ router.post('/', authMiddleware, doctorOnly, async (req: AuthRequest, res: Respo
     isPasswordVerified: false,
   });
 
-  const baseUrl = getBaseClientUrl(customBaseUrl);
+  const baseUrl = getBaseClientUrl(customBaseUrl, req);
   const captureUrl = `${baseUrl}/capture/${token}`;
 
   res.json({

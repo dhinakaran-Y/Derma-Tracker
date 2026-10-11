@@ -35,16 +35,39 @@ function getLocalIp(): string {
   return 'localhost';
 }
 
-function getBaseClientUrl(customBaseUrl?: string): string {
+function isPublicHost(urlOrHost: string): boolean {
+  if (!urlOrHost) return false;
+  const lower = urlOrHost.toLowerCase();
+  return (
+    !lower.includes('localhost') &&
+    !lower.includes('127.0.0.1') &&
+    !lower.includes('10.') &&
+    !lower.includes('192.168.') &&
+    !lower.includes('0.0.0.0')
+  );
+}
+
+function getBaseClientUrl(customBaseUrl?: string, req?: Request): string {
   // Priority 1: Explicit custom base URL (from frontend or env)
   if (customBaseUrl && typeof customBaseUrl === 'string' && customBaseUrl.trim().startsWith('http')) {
     return customBaseUrl.trim().replace(/\/+$/, '');
   }
 
-  // Priority 2: Active Cloudflare tunnel (auto cross-network support)
-  const tunnelUrl = tunnelManager.getTunnelUrl();
-  if (tunnelUrl) {
-    return tunnelUrl;
+  // Priority 2: Extract origin or referer from request if it is a public domain
+  if (req) {
+    try {
+      const originHeader = req.headers.origin;
+      if (typeof originHeader === 'string' && originHeader.startsWith('http') && isPublicHost(originHeader)) {
+        return originHeader.trim().replace(/\/+$/, '');
+      }
+      const refererHeader = req.headers.referer;
+      if (typeof refererHeader === 'string' && refererHeader.startsWith('http')) {
+        const parsed = new URL(refererHeader);
+        if (isPublicHost(parsed.host)) {
+          return parsed.origin.replace(/\/+$/, '');
+        }
+      }
+    } catch {}
   }
 
   // Priority 3: Configured public app URL
@@ -52,7 +75,13 @@ function getBaseClientUrl(customBaseUrl?: string): string {
     return process.env.PUBLIC_APP_URL.replace(/\/+$/, '');
   }
 
-  // Priority 4: LAN IP (same-network only)
+  // Priority 4: Active Cloudflare tunnel (auto cross-network support)
+  const tunnelUrl = tunnelManager.getTunnelUrl();
+  if (tunnelUrl) {
+    return tunnelUrl;
+  }
+
+  // Priority 5: LAN IP (same-network only for local dev)
   const clientPort = process.env.CLIENT_PORT || '3000';
   const ip = getLocalIp();
   return `http://${ip}:${clientPort}`;
@@ -129,14 +158,16 @@ router.post('/', authMiddleware, doctorOnly, async (req: AuthRequest, res: Respo
     lastActiveAt: new Date(),
   });
 
-  const baseUrl = getBaseClientUrl(customBaseUrl);
+  const baseUrl = getBaseClientUrl(customBaseUrl, req);
+  const isPublicBase = isPublicHost(baseUrl);
   const mobileUrl = `${baseUrl}/mobile/${token}`;
   const clientPort = process.env.CLIENT_PORT || '3000';
   const ip = getLocalIp();
-  const lanUrl = `http://${ip}:${clientPort}/mobile/${token}`;
   const rawTunnel = tunnelManager.getTunnelUrl();
-  const tunnelUrl = rawTunnel ? `${rawTunnel}/mobile/${token}` : null;
-  const isTunnelActive = !!rawTunnel;
+
+  const lanUrl = isPublicBase ? mobileUrl : `http://${ip}:${clientPort}/mobile/${token}`;
+  const tunnelUrl = isPublicBase ? mobileUrl : (rawTunnel ? `${rawTunnel}/mobile/${token}` : null);
+  const isTunnelActive = isPublicBase || !!rawTunnel;
 
   res.json({
     success: true,
@@ -160,9 +191,10 @@ router.get('/my-devices', authMiddleware, doctorOnly, async (req: AuthRequest, r
     expiresAt: { $gt: new Date() },
   }).sort({ createdAt: -1 });
 
-  const baseUrl = getBaseClientUrl();
+  const baseUrl = getBaseClientUrl(undefined, req);
+  const isPublicBase = isPublicHost(baseUrl);
   const rawTunnel = tunnelManager.getTunnelUrl();
-  const isTunnelActive = !!rawTunnel;
+  const isTunnelActive = isPublicBase || !!rawTunnel;
   const clientPort = process.env.CLIENT_PORT || '3000';
   const ip = getLocalIp();
 
@@ -174,6 +206,10 @@ router.get('/my-devices', authMiddleware, doctorOnly, async (req: AuthRequest, r
     if (diffSec < 30) connectionStatus = 'active';
     else if (diffSec < 120) connectionStatus = 'idle';
 
+    const mobileUrl = `${baseUrl}/mobile/${d.token}`;
+    const lanUrl = isPublicBase ? mobileUrl : `http://${ip}:${clientPort}/mobile/${d.token}`;
+    const tunnelUrl = isPublicBase ? mobileUrl : (rawTunnel ? `${rawTunnel}/mobile/${d.token}` : null);
+
     return {
       _id: d._id,
       token: d.token,
@@ -184,9 +220,9 @@ router.get('/my-devices', authMiddleware, doctorOnly, async (req: AuthRequest, r
       lastActiveAt: d.lastActiveAt,
       createdAt: d.createdAt,
       expiresAt: d.expiresAt,
-      mobileUrl: `${baseUrl}/mobile/${d.token}`,
-      lanUrl: `http://${ip}:${clientPort}/mobile/${d.token}`,
-      tunnelUrl: rawTunnel ? `${rawTunnel}/mobile/${d.token}` : null,
+      mobileUrl,
+      lanUrl,
+      tunnelUrl,
       isTunnelActive,
     };
   });

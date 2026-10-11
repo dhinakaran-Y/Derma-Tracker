@@ -51,6 +51,13 @@ router.post('/start', authMiddleware, doctorOnly, async (_req: AuthRequest, res:
 
 router.post('/restart', authMiddleware, doctorOnly, async (_req: AuthRequest, res: Response) => {
   try {
+    if (!tunnelManager.isCloudflaredAvailable()) {
+      res.json({
+        success: false,
+        error: 'cloudflared is not installed on this host. Cloudflare Quick Tunnel is only used for local offline development; cloud deployments already have direct public HTTPS access.',
+      });
+      return;
+    }
     tunnelManager.stopTunnel();
     const clientPort = parseInt(process.env.CLIENT_PORT || '3000', 10);
     const tunnelUrl = await tunnelManager.ensureTunnel(clientPort);

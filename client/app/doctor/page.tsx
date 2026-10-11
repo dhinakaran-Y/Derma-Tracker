@@ -183,6 +183,7 @@ export default function DoctorPage() {
 
   // Device Pairing State
   const [pairedDeviceCount, setPairedDeviceCount] = useState<number>(0);
+  const [pairedDevices, setPairedDevices] = useState<any[]>([]);
 
   const router = useRouter();
 
@@ -210,7 +211,9 @@ export default function DoctorPage() {
       setPatients(pRes.data.data || []);
       setAppointments(aRes.data.data || []);
       setMedicines(mRes.data.data || []);
-      setPairedDeviceCount((dRes.data.data || []).length);
+      const devices = dRes.data.data || [];
+      setPairedDevices(devices);
+      setPairedDeviceCount(devices.length);
       if (sRes?.data?.data?.consultationWorkflow) {
         setConsultationWorkflow(sRes.data.data.consultationWorkflow);
       }
@@ -274,11 +277,24 @@ export default function DoctorPage() {
     };
   }, [fetchDoctorData, activeVisit]);
 
-  const handleOpenMobileCamera = () => {
-    if (pairedDeviceCount > 0) {
+  const handleOpenMobileCamera = async () => {
+    let currentDevices = pairedDevices;
+    try {
+      const res = await api.get('/device-pairing/my-devices');
+      if (res.data?.data) {
+        currentDevices = res.data.data;
+        setPairedDevices(currentDevices);
+        setPairedDeviceCount(currentDevices.length);
+      }
+    } catch {}
+
+    const hasActiveDevice = currentDevices.some((d: any) => d.connectionStatus === 'active');
+
+    if (hasActiveDevice) {
       toast.info('📱 Your paired mobile device will auto-detect this patient. Check Device Pairing page for status.');
     } else {
-      toast.info('📱 No mobile device paired yet. You can manually visit the Device Pairing page from the navigation when ready to pair a phone.');
+      toast.info('📱 No devices actively paired. Redirecting to Mobile Device Management...');
+      router.push('/doctor/device-pair');
     }
   };
 

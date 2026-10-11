@@ -35,6 +35,21 @@ export function MobileCameraModal({
     }
   }, [stream]);
 
+  const fallbackInputRef = useRef<HTMLInputElement | null>(null);
+
+  const handleNativeCapture = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    try {
+      await onCapture(file);
+      stopTracks();
+      onClose();
+    } catch {}
+    if (fallbackInputRef.current) {
+      fallbackInputRef.current.value = '';
+    }
+  };
+
   // Start camera stream
   const startCamera = useCallback(async (mode: 'environment' | 'user') => {
     try {
@@ -46,8 +61,17 @@ export function MobileCameraModal({
         stream.getTracks().forEach((t) => t.stop());
       }
 
-      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-        throw new Error('Camera API is not supported in this browser.');
+      if (typeof navigator === 'undefined' || !navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+        const isHttpLan = typeof window !== 'undefined' &&
+          window.location.protocol === 'http:' &&
+          !['localhost', '127.0.0.1'].includes(window.location.hostname);
+
+        setCameraError(
+          isHttpLan
+            ? 'Live video viewfinder requires HTTPS on mobile devices. You can use your Phone Camera directly below to capture photos.'
+            : 'Live camera is not supported in this browser. Please use your Phone Camera directly below.'
+        );
+        return;
       }
 
       const newStream = await navigator.mediaDevices.getUserMedia({
@@ -65,14 +89,16 @@ export function MobileCameraModal({
         videoRef.current.srcObject = newStream;
       }
     } catch (err: any) {
-      console.error('Camera access error:', err);
+      console.warn('Camera access unavailable:', err?.message || err);
       let msg = 'Could not access phone camera.';
       if (err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError') {
-        msg = 'Camera permission denied. Please allow camera access in browser site settings.';
+        msg = 'Camera permission denied. Please allow camera access in browser site settings, or use the Phone Camera button below.';
       } else if (err.name === 'NotFoundError' || err.name === 'DevicesNotFoundError') {
-        msg = 'No camera found on this device.';
+        msg = 'No camera found on this device. Use the Phone Camera button below.';
       } else if (err.name === 'NotReadableError' || err.name === 'TrackStartError') {
         msg = 'Camera is already in use by another app. Please close other camera apps and retry.';
+      } else if (err.message) {
+        msg = err.message;
       }
       setCameraError(msg);
     } finally {
@@ -178,21 +204,38 @@ export function MobileCameraModal({
       {/* Viewfinder Viewport */}
       <div className="relative flex-1 flex items-center justify-center overflow-hidden bg-black">
         {cameraError ? (
-          <div className="p-6 text-center max-w-xs space-y-4">
-            <div className="w-14 h-14 mx-auto rounded-2xl bg-red-500/20 border border-red-500/30 text-red-400 flex items-center justify-center">
-              <AlertCircle className="w-7 h-7" />
+          <div className="p-6 text-center max-w-sm space-y-4">
+            <div className="w-14 h-14 mx-auto rounded-2xl bg-amber-500/20 border border-amber-500/30 text-amber-400 flex items-center justify-center">
+              <Camera className="w-7 h-7" />
             </div>
-            <p className="text-sm font-medium text-red-300">{cameraError}</p>
-            <p className="text-xs text-slate-400">
-              Ensure you have granted camera permissions in Chrome settings, or use the file upload option.
-            </p>
-            <button
-              type="button"
-              onClick={() => startCamera(facingMode)}
-              className="px-4 py-2 rounded-xl bg-slate-800 border border-slate-700 text-xs text-slate-200 font-semibold"
-            >
-              Retry Camera
-            </button>
+            <div>
+              <h3 className="text-base font-bold text-white mb-1.5">Capture with Phone Camera</h3>
+              <p className="text-xs text-slate-300 leading-relaxed">{cameraError}</p>
+            </div>
+
+            <div className="space-y-2.5 pt-2">
+              <label className="w-full py-3.5 px-4 rounded-xl font-bold text-sm bg-teal-600 hover:bg-teal-500 active:bg-teal-700 text-white flex items-center justify-center gap-2 cursor-pointer shadow-lg shadow-teal-600/30 active:scale-[0.98] transition-all">
+                <Camera className="w-4 h-4" />
+                <span>📸 Open Native Camera</span>
+                <input
+                  ref={fallbackInputRef}
+                  type="file"
+                  accept="image/*"
+                  capture="environment"
+                  className="hidden"
+                  onChange={handleNativeCapture}
+                />
+              </label>
+
+              <button
+                type="button"
+                onClick={() => startCamera(facingMode)}
+                className="w-full py-2 px-4 rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-700 text-xs text-slate-300 font-medium flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
+              >
+                <RefreshCw className="w-3.5 h-3.5" />
+                <span>Retry Live Stream</span>
+              </button>
+            </div>
           </div>
         ) : (
           <>
@@ -250,26 +293,39 @@ export function MobileCameraModal({
           <SwitchCamera className="w-5 h-5" />
         </button>
 
-        {/* Shutter Button */}
-        <button
-          type="button"
-          onClick={handleCapture}
-          disabled={uploading || startingCamera || !!cameraError}
-          className={`w-20 h-20 rounded-full border-4 flex items-center justify-center transition-transform active:scale-95 shadow-xl ${
-            uploading
-              ? 'border-slate-600 bg-slate-800 text-slate-400'
-              : 'border-white bg-teal-500 hover:bg-teal-400 text-white shadow-teal-500/40'
-          }`}
-          aria-label="Take photo"
-        >
-          {uploading ? (
-            <RefreshCw className="w-7 h-7 animate-spin text-white" />
-          ) : (
-            <div className="w-14 h-14 rounded-full border-2 border-white/60 bg-white/20 flex items-center justify-center">
-              <Camera className="w-6 h-6 text-white" />
-            </div>
-          )}
-        </button>
+        {/* Shutter Button / Native Snap Button */}
+        {cameraError ? (
+          <button
+            type="button"
+            onClick={() => fallbackInputRef.current?.click()}
+            disabled={uploading}
+            className="w-20 h-20 rounded-full border-4 border-teal-400 bg-teal-500 hover:bg-teal-400 text-white flex flex-col items-center justify-center transition-transform active:scale-95 shadow-xl shadow-teal-500/40 cursor-pointer"
+            title="Snap with phone camera"
+          >
+            <Camera className="w-7 h-7 text-white" />
+            <span className="text-[10px] font-bold uppercase mt-0.5">Snap</span>
+          </button>
+        ) : (
+          <button
+            type="button"
+            onClick={handleCapture}
+            disabled={uploading || startingCamera}
+            className={`w-20 h-20 rounded-full border-4 flex items-center justify-center transition-transform active:scale-95 shadow-xl ${
+              uploading
+                ? 'border-slate-600 bg-slate-800 text-slate-400'
+                : 'border-white bg-teal-500 hover:bg-teal-400 text-white shadow-teal-500/40'
+            }`}
+            aria-label="Take photo"
+          >
+            {uploading ? (
+              <RefreshCw className="w-7 h-7 animate-spin text-white" />
+            ) : (
+              <div className="w-14 h-14 rounded-full border-2 border-white/60 bg-white/20 flex items-center justify-center">
+                <Camera className="w-6 h-6 text-white" />
+              </div>
+            )}
+          </button>
+        )}
 
         {/* Done / Close Viewfinder */}
         <button

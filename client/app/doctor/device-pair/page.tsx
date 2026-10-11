@@ -69,6 +69,24 @@ export default function DevicePairPage() {
   const [tunnelStarting, setTunnelStarting] = useState(false);
   const [networkMode, setNetworkMode] = useState<'lan' | 'tunnel'>('lan');
   const [restartingTunnel, setRestartingTunnel] = useState(false);
+  const [isPublicDeployment, setIsPublicDeployment] = useState(false);
+
+  // Detect whether we are running on a public deployed host (e.g. Vercel)
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const hostname = window.location.hostname;
+      const isPublic =
+        hostname !== 'localhost' &&
+        hostname !== '127.0.0.1' &&
+        !hostname.startsWith('192.168.') &&
+        !hostname.startsWith('10.');
+      setIsPublicDeployment(isPublic);
+      if (isPublic) {
+        setIsTunnelActive(true);
+        setNetworkMode('tunnel');
+      }
+    }
+  }, []);
 
   // Device renaming state
   const [editingToken, setEditingToken] = useState<string | null>(null);
@@ -78,6 +96,20 @@ export default function DevicePairPage() {
   // Helper to compute or get exact mobile URL for a paired device
   const getDeviceMobileUrl = useCallback(
     (device: PairedDevice, mode: 'lan' | 'tunnel' = networkMode) => {
+      // 1. On public production deployments (e.g. Vercel), ALWAYS use current origin
+      if (typeof window !== 'undefined') {
+        const hostname = window.location.hostname;
+        const isPublic =
+          hostname !== 'localhost' &&
+          hostname !== '127.0.0.1' &&
+          !hostname.startsWith('192.168.') &&
+          !hostname.startsWith('10.');
+        if (isPublic) {
+          return `${window.location.origin}/mobile/${device.token}`;
+        }
+      }
+
+      // 2. Otherwise local dev fallback logic:
       if (mode === 'lan' && device.lanUrl) return device.lanUrl;
       if (mode === 'tunnel') {
         if (device.tunnelUrl) return device.tunnelUrl;
@@ -124,10 +156,10 @@ export default function DevicePairPage() {
       setNewPairingTunnelUrl(device.tunnelUrl || null);
       const url = getDeviceMobileUrl(device, networkMode);
       setNewPairingUrl(url);
-      setIsTunnelActive(device.isTunnelActive ?? (tunnelStatus?.status === 'running'));
+      setIsTunnelActive(isPublicDeployment || (device.isTunnelActive ?? (tunnelStatus?.status === 'running')));
       setQrModalDevice(device);
     },
-    [getDeviceMobileUrl, networkMode, tunnelStatus]
+    [getDeviceMobileUrl, isPublicDeployment, networkMode, tunnelStatus]
   );
 
   // Fetch paired devices
@@ -165,45 +197,64 @@ export default function DevicePairPage() {
     return () => clearInterval(interval);
   }, [fetchDevices, fetchTunnelStatus]);
 
-  // Start tunnel and generate QR in one step
+  // Start tunnel (local dev only) and generate QR in one step
   const handleGeneratePairing = async () => {
     try {
       setSelectedDevice(null);
       setGenerating(true);
-      setTunnelStarting(true);
 
-      // Step 1: Start tunnel (if not already running)
-      let tunnelActive = isTunnelActive;
-      if (!tunnelActive) {
-        try {
-          const tunnelRes = await api.post('/tunnel/start');
-          if (tunnelRes.data?.success && tunnelRes.data.data) {
-            const td = tunnelRes.data.data;
-            if (td.status === 'running' && td.url) {
-              tunnelActive = true;
-              setIsTunnelActive(true);
-              setTunnelStatus({ status: 'running', url: td.url, cloudflaredInstalled: true });
-            } else if (td.status === 'unavailable') {
-              // cloudflared not installed — will fall back to LAN mode
-              setTunnelStatus({ status: 'unavailable', url: null, cloudflaredInstalled: false });
+      const isPublic =
+        typeof window !== 'undefined' &&
+        window.location.hostname !== 'localhost' &&
+        window.location.hostname !== '127.0.0.1' &&
+        !window.location.hostname.startsWith('192.168.') &&
+        !window.location.hostname.startsWith('10.');
+
+      // Step 1: In local development only, attempt to start tunnel if needed
+      if (!isPublic) {
+        let tunnelActive = isTunnelActive;
+        if (!tunnelActive) {
+          setTunnelStarting(true);
+          try {
+            const tunnelRes = await api.post('/tunnel/start');
+            if (tunnelRes.data?.success && tunnelRes.data.data) {
+              const td = tunnelRes.data.data;
+              if (td.status === 'running' && td.url) {
+                tunnelActive = true;
+                setIsTunnelActive(true);
+                setTunnelStatus({ status: 'running', url: td.url, cloudflaredInstalled: true });
+              } else if (td.status === 'unavailable') {
+                setTunnelStatus({ status: 'unavailable', url: null, cloudflaredInstalled: false });
+              }
             }
+          } catch {
+            // Tunnel failed — will fall back to LAN mode
           }
-        } catch {
-          // Tunnel failed — will fall back to LAN mode
+          setTunnelStarting(false);
         }
       }
-      setTunnelStarting(false);
 
-      // Step 2: Generate pairing QR (backend auto-uses tunnel URL if available)
-      const res = await api.post('/device-pairing', {});
+      // Step 2: Generate pairing QR with explicit browser origin
+      const clientOrigin = typeof window !== 'undefined' ? window.location.origin : undefined;
+      const res = await api.post('/device-pairing', {
+        customBaseUrl: clientOrigin,
+      });
+
       if (res.data?.success && res.data.data) {
-        setNewPairingUrl(res.data.data.mobileUrl);
-        setNewPairingLanUrl(res.data.data.lanUrl || null);
-        setNewPairingTunnelUrl(res.data.data.tunnelUrl || null);
-        setNewPairingToken(res.data.data.token);
-        setIsTunnelActive(!!res.data.data.isTunnelActive);
+        const token = res.data.data.token;
+        const publicMobileUrl = isPublic && clientOrigin
+          ? `${clientOrigin}/mobile/${token}`
+          : res.data.data.mobileUrl;
 
-        if (res.data.data.isTunnelActive) {
+        setNewPairingUrl(publicMobileUrl);
+        setNewPairingLanUrl(isPublic ? publicMobileUrl : (res.data.data.lanUrl || null));
+        setNewPairingTunnelUrl(isPublic ? publicMobileUrl : (res.data.data.tunnelUrl || null));
+        setNewPairingToken(token);
+        setIsTunnelActive(isPublic || !!res.data.data.isTunnelActive);
+
+        if (isPublic) {
+          toast.success('Mobile Pairing QR generated — scan with any mobile');
+        } else if (res.data.data.isTunnelActive) {
           toast.success('Cross-network QR generated — scan from any mobile');
         } else {
           toast.success('QR generated — scan from same Wi-Fi network');
@@ -401,38 +452,56 @@ export default function DevicePairPage() {
 
                 {newPairingUrl ? (
                   <>
-                    {/* Network Mode Switcher */}
-                    <div className="w-full flex items-center justify-center p-1 bg-[var(--surface-3)] rounded-xl border border-[var(--border)] gap-1">
-                      <button
-                        type="button"
-                        onClick={() => setNetworkMode('lan')}
-                        className={`flex-1 flex items-center justify-center gap-1.5 py-2 px-3 rounded-lg text-xs font-mono font-semibold transition-all ${
-                          networkMode === 'lan'
-                            ? 'bg-[var(--brass)] text-black shadow-md'
-                            : 'text-[var(--text-dim)] hover:text-[var(--text)]'
-                        }`}
-                      >
-                        <Wifi className="w-3.5 h-3.5" />
-                        <span>Clinic Wi-Fi (Direct)</span>
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setNetworkMode('tunnel')}
-                        className={`flex-1 flex items-center justify-center gap-1.5 py-2 px-3 rounded-lg text-xs font-mono font-semibold transition-all ${
-                          networkMode === 'tunnel'
-                            ? 'bg-emerald-500 text-black shadow-md'
-                            : 'text-[var(--text-dim)] hover:text-[var(--text)]'
-                        }`}
-                      >
-                        <Globe className="w-3.5 h-3.5" />
-                        <span>Cloudflare (Mobile Data)</span>
-                      </button>
-                    </div>
+                    {/* Network Mode / Status Switcher */}
+                    {isPublicDeployment ? (
+                      <div className="w-full flex items-center justify-between p-2.5 bg-emerald-500/10 border border-emerald-500/25 rounded-xl text-emerald-400 text-xs font-mono font-semibold gap-2">
+                        <div className="flex items-center gap-2 min-w-0">
+                          <Globe className="w-4 h-4 text-emerald-400 shrink-0" />
+                          <span className="truncate">Public Cloud Deployment (HTTPS)</span>
+                        </div>
+                        <span className="flex items-center gap-1 text-[11px] bg-emerald-500/20 px-2 py-0.5 rounded-full shrink-0">
+                          <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                          Universal Mobile Access
+                        </span>
+                      </div>
+                    ) : (
+                      <div className="w-full flex items-center justify-center p-1 bg-[var(--surface-3)] rounded-xl border border-[var(--border)] gap-1">
+                        <button
+                          type="button"
+                          onClick={() => setNetworkMode('lan')}
+                          className={`flex-1 flex items-center justify-center gap-1.5 py-2 px-3 rounded-lg text-xs font-mono font-semibold transition-all ${
+                            networkMode === 'lan'
+                              ? 'bg-[var(--brass)] text-black shadow-md'
+                              : 'text-[var(--text-dim)] hover:text-[var(--text)]'
+                          }`}
+                        >
+                          <Wifi className="w-3.5 h-3.5" />
+                          <span>Clinic Wi-Fi (Direct)</span>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setNetworkMode('tunnel')}
+                          className={`flex-1 flex items-center justify-center gap-1.5 py-2 px-3 rounded-lg text-xs font-mono font-semibold transition-all ${
+                            networkMode === 'tunnel'
+                              ? 'bg-emerald-500 text-black shadow-md'
+                              : 'text-[var(--text-dim)] hover:text-[var(--text)]'
+                          }`}
+                        >
+                          <Globe className="w-3.5 h-3.5" />
+                          <span>Cloudflare (Mobile Data)</span>
+                        </button>
+                      </div>
+                    )}
 
                     {/* Mode Guidance */}
-                    {networkMode === 'lan' ? (
+                    {isPublicDeployment ? (
+                      <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-[11px] font-mono">
+                        <ShieldCheck className="w-3.5 h-3.5" />
+                        <span>Direct HTTPS • Scan with phone camera on any network (Wi-Fi, 4G, 5G)</span>
+                      </div>
+                    ) : networkMode === 'lan' ? (
                       <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-amber-500/10 border border-amber-500/20 text-amber-400 text-[11px] font-mono">
-                        <Wifi className="w-3 h-3" />
+                        <Wifi className="w-3.5 h-3.5" />
                         <span>Same Wi-Fi • 100% Reliable • No Error 1033</span>
                       </div>
                     ) : (
@@ -455,10 +524,20 @@ export default function DevicePairPage() {
 
                     {/* QR Code */}
                     {(() => {
-                      const activeDisplayUrl = (networkMode === 'lan'
-                        ? (selectedDevice?.lanUrl || newPairingLanUrl)
-                        : (selectedDevice?.tunnelUrl || newPairingTunnelUrl))
-                        || newPairingUrl;
+                      const activeDisplayUrl = (() => {
+                        if (isPublicDeployment && typeof window !== 'undefined') {
+                          const token = selectedDevice?.token || newPairingToken;
+                          if (token) return `${window.location.origin}/mobile/${token}`;
+                          if (newPairingUrl) return newPairingUrl;
+                        }
+                        return (
+                          (networkMode === 'lan'
+                            ? (selectedDevice?.lanUrl || newPairingLanUrl)
+                            : (selectedDevice?.tunnelUrl || newPairingTunnelUrl))
+                          || newPairingUrl
+                          || (selectedDevice ? `${typeof window !== 'undefined' ? window.location.origin : ''}/mobile/${selectedDevice.token}` : '')
+                        );
+                      })();
 
                       return (
                         <>
@@ -554,7 +633,12 @@ export default function DevicePairPage() {
               </div>
 
               {/* Tunnel Status Indicator */}
-              {tunnelStatus && (
+              {isPublicDeployment ? (
+                <div className="mt-3 p-2.5 rounded-lg border text-[11px] font-mono flex items-center gap-2 bg-emerald-500/5 border-emerald-500/15 text-emerald-400">
+                  <Zap className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+                  <span>Direct Cloud Live — QR code works instantly on any network (Wi-Fi, 4G, 5G)</span>
+                </div>
+              ) : tunnelStatus ? (
                 <div className={`mt-3 p-2.5 rounded-lg border text-[11px] font-mono flex items-center gap-2 ${
                   tunnelStatus.status === 'running'
                     ? 'bg-emerald-500/5 border-emerald-500/15 text-emerald-400'
@@ -579,7 +663,7 @@ export default function DevicePairPage() {
                     </>
                   )}
                 </div>
-              )}
+              ) : null}
             </Panel>
           </div>
 
@@ -862,14 +946,14 @@ export default function DevicePairPage() {
                 </span>
               )}
               <div className={`flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium ${
-                (qrModalDevice.isTunnelActive ?? isTunnelActive)
+                (isPublicDeployment || (qrModalDevice.isTunnelActive ?? isTunnelActive))
                   ? 'bg-emerald-500/10 border border-emerald-500/20 text-emerald-400'
                   : 'bg-amber-500/10 border border-amber-500/20 text-amber-400'
               }`}>
-                {(qrModalDevice.isTunnelActive ?? isTunnelActive) ? (
+                {(isPublicDeployment || (qrModalDevice.isTunnelActive ?? isTunnelActive)) ? (
                   <>
                     <Globe className="w-3 h-3" />
-                    <span>Cross-Network</span>
+                    <span>{isPublicDeployment ? 'Cloud Direct (Any Network)' : 'Cross-Network'}</span>
                   </>
                 ) : (
                   <>

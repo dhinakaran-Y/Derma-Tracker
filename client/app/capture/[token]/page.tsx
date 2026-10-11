@@ -3,7 +3,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useParams } from 'next/navigation';
 import axios from 'axios';
-import { Camera, CheckCircle2, AlertCircle, RefreshCw, Upload, Image as ImageIcon, Shield, Trash2 } from 'lucide-react';
+import { Camera, CheckCircle2, AlertCircle, RefreshCw, Upload, Image as ImageIcon, Shield, Trash2, Eye, EyeOff } from 'lucide-react';
 import { MobileCameraModal } from '@/components/MobileCameraModal';
 import { compressImage } from '@/lib/imageCompression';
 import { getApiBaseUrl } from '@/lib/api';
@@ -72,6 +72,7 @@ export default function MobileCapturePage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [verifyingPassword, setVerifyingPassword] = useState(false);
   const [passwordError, setPasswordError] = useState<string | null>(null);
   const [isVerified, setIsVerified] = useState(false);
@@ -451,14 +452,25 @@ export default function MobileCapturePage() {
               <label className="block text-xs font-semibold text-slate-300 mb-1.5">
                 Doctor's Account Password
               </label>
-              <input
-                type="password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                placeholder="Enter password to unlock..."
-                autoFocus
-                className="w-full px-4 py-3 rounded-xl bg-slate-950 border border-slate-700 text-white placeholder-slate-500 text-sm focus:outline-none focus:border-teal-500 focus:ring-1 focus:ring-teal-500 transition-all"
-              />
+              <div className="relative">
+                <input
+                  type={showPassword ? 'text' : 'password'}
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  placeholder="Enter password to unlock..."
+                  autoFocus
+                  className="w-full pl-4 pr-11 py-3 rounded-xl bg-slate-950 border border-slate-700 text-white placeholder-slate-500 text-sm focus:outline-none focus:border-teal-500 focus:ring-1 focus:ring-teal-500 transition-all font-mono"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-200 transition-colors p-1 cursor-pointer"
+                  title={showPassword ? 'Hide password' : 'Show password'}
+                  tabIndex={-1}
+                >
+                  {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                </button>
+              </div>
             </div>
 
             {passwordError && (
