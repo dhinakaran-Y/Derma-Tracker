@@ -327,14 +327,11 @@ export default function PatientPage() {
     }))
   );
 
-  const baselinePhoto =
-    allScalpImages[0]?.url || '/images/scalp-dummy-images/scalp-stage-4.png';
+  const baselinePhoto = allScalpImages[0]?.url || '';
   const baselineDate = allScalpImages[0]
     ? new Date(allScalpImages[0].date).toLocaleDateString()
     : 'Month 0 (Baseline)';
-  const latestPhoto =
-    allScalpImages[allScalpImages.length - 1]?.url ||
-    '/images/scalp-dummy-images/scalp-stage-2.png';
+  const latestPhoto = allScalpImages[allScalpImages.length - 1]?.url || '';
   const latestDate = allScalpImages[allScalpImages.length - 1]
     ? new Date(allScalpImages[allScalpImages.length - 1].date).toLocaleDateString()
     : 'Latest Trichoscopy';
@@ -845,15 +842,51 @@ export default function PatientPage() {
               {/* Scalp Photo Comparison */}
               <Panel
                 title="High-Magnification Trichoscopy Comparison"
-                subtitle="Baseline dermoscopy versus latest clinical review"
+                subtitle={
+                  allScalpImages.length > 0
+                    ? 'Baseline dermoscopy versus latest clinical review'
+                    : 'No images added yet'
+                }
               >
                 <div className="space-y-4 pt-1">
-                  <CompareSlider
-                    beforeImage={baselinePhoto}
-                    afterImage={latestPhoto}
-                    beforeLabel={baselineDate}
-                    afterLabel={latestDate}
-                  />
+                  {allScalpImages.length === 0 ? (
+                    <div className="flex flex-col items-center justify-center p-8 border-2 border-dashed border-[var(--border)] rounded-xl bg-[var(--surface-2)]/40 text-center min-h-[280px]">
+                      <div className="w-14 h-14 rounded-2xl bg-[var(--brass)]/10 text-[var(--brass)] border border-[var(--brass)]/20 flex items-center justify-center mb-3">
+                        <ImageIcon className="w-7 h-7" />
+                      </div>
+                      <h4 className="text-sm font-bold text-[var(--text)]">No Images Added Yet</h4>
+                      <p className="text-xs text-[var(--text-dim)] max-w-xs mt-1">
+                        Clinical scalp photos captured by your doctor during consultations will appear here for side-by-side progress comparison.
+                      </p>
+                    </div>
+                  ) : allScalpImages.length === 1 ? (
+                    <div className="space-y-3">
+                      <div className="relative w-full h-[280px] rounded-lg overflow-hidden border border-[var(--border)] bg-black shadow-inner">
+                        <img
+                          src={baselinePhoto}
+                          alt="Baseline Trichoscopy"
+                          className="w-full h-full object-cover"
+                        />
+                        <div className="absolute bottom-3 left-3 z-10">
+                          <span className="font-mono text-xs px-2.5 py-1 rounded bg-black/80 text-white/95 border border-white/20 shadow-md">
+                            Baseline ({baselineDate})
+                          </span>
+                        </div>
+                        <div className="absolute top-3 right-3 z-10">
+                          <span className="font-mono text-[10px] px-2.5 py-1 rounded bg-[var(--brass)]/20 text-[var(--brass)] border border-[var(--brass)]/30 backdrop-blur-xs font-semibold shadow-md">
+                            1 Photo Recorded • Comparison enables after next scan
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  ) : (
+                    <CompareSlider
+                      beforeImage={baselinePhoto}
+                      afterImage={latestPhoto}
+                      beforeLabel={baselineDate}
+                      afterLabel={latestDate}
+                    />
+                  )}
 
                   {/* Scalp Gallery Strip if multiple photos */}
                   {allScalpImages.length > 0 && (

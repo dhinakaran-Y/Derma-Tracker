@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useRef } from 'react';
-import { Camera, RefreshCw, X, Check, AlertCircle, Trash2, SwitchCamera } from 'lucide-react';
+import { Camera, RefreshCw, X, Check, AlertCircle, Trash2, SwitchCamera, UploadCloud } from 'lucide-react';
 import { api, getMediaUrl, getErrorMessage } from '@/lib/api';
 
 interface ScalpCameraModalProps {
@@ -31,6 +31,7 @@ export function ScalpCameraModal({
   const [deletingFilename, setDeletingFilename] = useState<string | null>(null);
 
   const videoRef = useRef<HTMLVideoElement | null>(null);
+  const modalFileInputRef = useRef<HTMLInputElement | null>(null);
 
   // Sync initial images
   useEffect(() => {
@@ -169,6 +170,43 @@ export function ScalpCameraModal({
     } finally {
       setCapturing(false);
       setUploading(false);
+    }
+  };
+
+  // Upload photo from local storage/drive
+  const handleLocalFileModalUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (!files || files.length === 0 || images.length >= 5 || uploading) return;
+
+    const availableSlots = 5 - images.length;
+    const fileList = Array.from(files).filter((f) => f.type.startsWith('image/')).slice(0, availableSlots);
+    if (fileList.length === 0) return;
+
+    try {
+      setUploading(true);
+      setError(null);
+
+      let updated = [...images];
+      for (const file of fileList) {
+        const formData = new FormData();
+        formData.append('image', file);
+
+        const res = await api.post(`/doctor/visits/${visitId}/images`, formData, {
+          headers: { 'Content-Type': 'multipart/form-data' },
+        });
+
+        if (res.data?.success && res.data.data?.scalpImages) {
+          updated = res.data.data.scalpImages;
+        }
+      }
+
+      setImages(updated);
+      onImagesUpdated(updated);
+    } catch (err) {
+      setError(getErrorMessage(err, 'Failed to upload photo from local drive'));
+    } finally {
+      setUploading(false);
+      if (modalFileInputRef.current) modalFileInputRef.current.value = '';
     }
   };
 
@@ -322,7 +360,16 @@ export function ScalpCameraModal({
             </div>
 
             {/* Actions */}
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-3 flex-wrap">
+              <input
+                ref={modalFileInputRef}
+                type="file"
+                accept="image/*"
+                multiple
+                style={{ display: 'none' }}
+                onChange={handleLocalFileModalUpload}
+              />
+
               <button
                 type="button"
                 onClick={handleCapture}
@@ -330,13 +377,13 @@ export function ScalpCameraModal({
                 className={`flex items-center gap-2 px-5 py-2.5 rounded-xl font-semibold text-sm transition-all shadow-md ${
                   isMaxReached || !selectedDeviceId
                     ? 'bg-[var(--surface-3)] text-[var(--text-dim)] cursor-not-allowed'
-                    : 'bg-teal-600 hover:bg-teal-500 active:scale-95 text-white shadow-teal-500/20'
+                    : 'bg-teal-600 hover:bg-teal-500 active:scale-95 text-white shadow-teal-500/20 cursor-pointer'
                 }`}
               >
                 {uploading ? (
                   <>
                     <RefreshCw className="w-4 h-4 animate-spin" />
-                    <span>Saving Original...</span>
+                    <span>Saving Photo...</span>
                   </>
                 ) : (
                   <>
@@ -348,8 +395,19 @@ export function ScalpCameraModal({
 
               <button
                 type="button"
+                onClick={() => modalFileInputRef.current?.click()}
+                disabled={isMaxReached || uploading || capturing}
+                className="flex items-center gap-2 px-4 py-2.5 rounded-xl border border-[var(--border)] bg-[var(--surface-2)] hover:bg-[var(--surface-3)] text-[var(--text)] text-sm font-medium transition-colors cursor-pointer disabled:opacity-50"
+                title="Upload photos from your local computer / drive"
+              >
+                <UploadCloud className="w-4 h-4 text-teal-500" />
+                <span>Upload from Drive</span>
+              </button>
+
+              <button
+                type="button"
                 onClick={handleClose}
-                className="px-4 py-2.5 rounded-xl border border-[var(--border)] text-[var(--text)] hover:bg-[var(--surface-3)] text-sm font-medium transition-colors"
+                className="px-4 py-2.5 rounded-xl border border-[var(--border)] text-[var(--text)] hover:bg-[var(--surface-3)] text-sm font-medium transition-colors cursor-pointer"
               >
                 Done
               </button>

@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { AppShell } from '../../components/AppShell';
 import { KpiCard } from '../../components/KpiCard';
@@ -12,7 +12,7 @@ import { MedicineSearchDropdown } from '../../components/MedicineSearchDropdown'
 import { QrBox } from '../../components/QrBox';
 import { ScalpCameraModal } from '../../components/ScalpCameraModal';
 import { ImageLightboxModal } from '../../components/ImageLightboxModal';
-import { api, getMediaUrl } from '../../lib/api';
+import { api, getMediaUrl, getErrorMessage } from '../../lib/api';
 import { getSocket } from '../../lib/socket';
 import { AppointmentLockModal } from '../../components/AppointmentLockModal';
 import { AppointmentActionModal } from '../../components/AppointmentActionModal';
@@ -55,6 +55,7 @@ import {
   FileText,
   CheckCircle2,
   Laptop,
+  UploadCloud,
 } from 'lucide-react';
 import {
   LineChart,
@@ -193,6 +194,8 @@ export default function DoctorPage() {
   const [lightboxImages, setLightboxImages] = useState<string[]>([]);
   const [activeScalpCarouselIdx, setActiveScalpCarouselIdx] = useState(0);
   const [deletingImageFilename, setDeletingImageFilename] = useState<string | null>(null);
+  const [isUploadingLocal, setIsUploadingLocal] = useState(false);
+  const localFileInputRef = useRef<HTMLInputElement | null>(null);
 
 
 
@@ -315,6 +318,72 @@ export default function DoctorPage() {
       toast.error('Failed to delete scalp photo');
     } finally {
       setDeletingImageFilename(null);
+    }
+  };
+
+  const handleLocalFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (!files || files.length === 0) return;
+    if (!activeVisit) {
+      toast.error('Please select an active patient consultation first');
+      return;
+    }
+
+    const currentCount = activeVisit.scalpImages?.length || 0;
+    const availableSlots = 5 - currentCount;
+    if (availableSlots <= 0) {
+      toast.error('Maximum limit of 5 scalp images reached for this visit. Please delete an existing image first.');
+      if (localFileInputRef.current) localFileInputRef.current.value = '';
+      return;
+    }
+
+    const fileList = Array.from(files).filter((f) => f.type.startsWith('image/'));
+    if (fileList.length === 0) {
+      toast.error('Please select valid image file(s) (PNG, JPG, JPEG, WEBP)');
+      if (localFileInputRef.current) localFileInputRef.current.value = '';
+      return;
+    }
+
+    const filesToUpload = fileList.slice(0, availableSlots);
+    if (fileList.length > availableSlots) {
+      toast.info(`Only ${availableSlots} slot(s) remaining. Uploading ${availableSlots} photo(s).`);
+    }
+
+    try {
+      setIsUploadingLocal(true);
+      toast.loading(`Uploading ${filesToUpload.length} clinical photo(s) from local drive...`, {
+        id: 'local-scalp-upload',
+      });
+
+      let updatedImages: string[] = activeVisit.scalpImages || [];
+      for (const file of filesToUpload) {
+        const formData = new FormData();
+        formData.append('image', file);
+
+        const res = await api.post(`/doctor/visits/${activeVisit._id}/images`, formData, {
+          headers: { 'Content-Type': 'multipart/form-data' },
+        });
+
+        if (res.data?.success && res.data.data?.scalpImages) {
+          updatedImages = res.data.data.scalpImages;
+        }
+      }
+
+      setActiveVisit((prev) => (prev ? { ...prev, scalpImages: updatedImages } : null));
+      setActiveScalpCarouselIdx(0);
+      toast.success(
+        filesToUpload.length === 1
+          ? 'Clinical scalp photo uploaded from local drive!'
+          : `${filesToUpload.length} clinical scalp photos uploaded from local drive!`,
+        { id: 'local-scalp-upload' }
+      );
+    } catch (err) {
+      toast.error(getErrorMessage(err, 'Failed to upload photo from local drive'), {
+        id: 'local-scalp-upload',
+      });
+    } finally {
+      setIsUploadingLocal(false);
+      if (localFileInputRef.current) localFileInputRef.current.value = '';
     }
   };
 
@@ -639,6 +708,15 @@ export default function DoctorPage() {
           ) : null
         }
       >
+        <input
+          ref={localFileInputRef}
+          type="file"
+          accept="image/*"
+          multiple
+          style={{ display: 'none' }}
+          onChange={handleLocalFileUpload}
+        />
+
         {!hasImages ? (
           /* Empty State */
           <div className="flex flex-col items-center justify-center p-8 border-2 border-dashed border-[var(--border)] rounded-xl bg-[var(--surface-2)]/40 text-center">
@@ -650,12 +728,12 @@ export default function DoctorPage() {
               Capture scalp photos to begin clinical phototrichogram comparison tracking. Maximum 5 photos per visit.
             </p>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 w-full max-w-sm">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 w-full max-w-md">
               <button
                 type="button"
                 onClick={() => setSystemCameraOpen(true)}
-                disabled={isMaxReached}
-                className="flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-teal-600 hover:bg-teal-500 text-white font-semibold text-xs transition-colors shadow-md disabled:opacity-50 cursor-pointer"
+                disabled={isMaxReached || isUploadingLocal}
+                className="flex items-center justify-center gap-2 px-3 py-2.5 rounded-xl bg-teal-600 hover:bg-teal-500 text-white font-semibold text-xs transition-colors shadow-md disabled:opacity-50 cursor-pointer"
               >
                 <Camera className="w-4 h-4" />
                 <span>System Camera</span>
@@ -664,11 +742,26 @@ export default function DoctorPage() {
               <button
                 type="button"
                 onClick={handleOpenMobileCamera}
-                disabled={isMaxReached}
-                className="flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-[var(--surface-2)] hover:bg-[var(--surface-3)] text-[var(--text)] border border-[var(--border)] font-semibold text-xs transition-colors shadow-sm disabled:opacity-50 cursor-pointer"
+                disabled={isMaxReached || isUploadingLocal}
+                className="flex items-center justify-center gap-2 px-3 py-2.5 rounded-xl bg-[var(--surface-2)] hover:bg-[var(--surface-3)] text-[var(--text)] border border-[var(--border)] font-semibold text-xs transition-colors shadow-sm disabled:opacity-50 cursor-pointer"
               >
                 <Smartphone className="w-4 h-4" />
                 <span>Mobile Camera</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => localFileInputRef.current?.click()}
+                disabled={isMaxReached || isUploadingLocal}
+                className="flex items-center justify-center gap-2 px-3 py-2.5 rounded-xl bg-[var(--surface-2)] hover:bg-[var(--surface-3)] text-[var(--text)] border border-[var(--border)] font-semibold text-xs transition-colors shadow-sm disabled:opacity-50 cursor-pointer hover:border-teal-500"
+                title="Upload saved photos from your local computer / drive"
+              >
+                {isUploadingLocal ? (
+                  <RefreshCw className="w-4 h-4 animate-spin text-teal-500" />
+                ) : (
+                  <UploadCloud className="w-4 h-4 text-teal-500" />
+                )}
+                <span>Local Storage</span>
               </button>
             </div>
           </div>
@@ -792,16 +885,16 @@ export default function DoctorPage() {
             </div>
 
             {/* Quick Capture Bar inside Panel */}
-            <div className="p-3 bg-[var(--surface-2)] border border-[var(--border)] rounded-xl flex items-center justify-between gap-3">
+            <div className="p-3 bg-[var(--surface-2)] border border-[var(--border)] rounded-xl flex items-center justify-between gap-3 flex-wrap">
               <span className="text-xs font-mono text-[var(--text-dim)]">
                 Active Visit: <strong className="text-[var(--text)]">{currentVisitPhotos.length} / 5</strong>
               </span>
 
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 flex-wrap">
                 <button
                   type="button"
                   onClick={() => setSystemCameraOpen(true)}
-                  disabled={isMaxReached}
+                  disabled={isMaxReached || isUploadingLocal}
                   className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-teal-600 hover:bg-teal-500 text-white text-xs font-semibold transition-colors disabled:opacity-50 cursor-pointer"
                 >
                   <Camera className="w-3.5 h-3.5" />
@@ -811,6 +904,7 @@ export default function DoctorPage() {
                 <button
                   type="button"
                   onClick={handleOpenMobileCamera}
+                  disabled={isMaxReached || isUploadingLocal}
                   title={
                     pairedDeviceCount > 0
                       ? `${pairedDeviceCount} device(s) paired — auto-captures for active patient`
@@ -820,10 +914,25 @@ export default function DoctorPage() {
                     pairedDeviceCount > 0
                       ? 'bg-emerald-600/15 border-emerald-500/30 text-emerald-500'
                       : 'bg-[var(--surface-2)] hover:bg-[var(--surface-3)] border-[var(--border)] text-[var(--text)]'
-                  } border text-xs font-semibold transition-colors cursor-pointer`}
+                  } border text-xs font-semibold transition-colors disabled:opacity-50 cursor-pointer`}
                 >
                   <Smartphone className="w-3.5 h-3.5" />
                   <span>{pairedDeviceCount > 0 ? `${pairedDeviceCount} Paired` : 'Pair Mobile'}</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => localFileInputRef.current?.click()}
+                  disabled={isMaxReached || isUploadingLocal}
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[var(--surface-2)] hover:bg-[var(--surface-3)] text-[var(--text)] border border-[var(--border)] text-xs font-semibold transition-colors disabled:opacity-50 cursor-pointer hover:border-teal-500"
+                  title="Upload saved photos from your local computer / drive"
+                >
+                  {isUploadingLocal ? (
+                    <RefreshCw className="w-3.5 h-3.5 animate-spin text-teal-500" />
+                  ) : (
+                    <UploadCloud className="w-3.5 h-3.5 text-teal-500" />
+                  )}
+                  <span>Local Storage</span>
                 </button>
               </div>
             </div>
