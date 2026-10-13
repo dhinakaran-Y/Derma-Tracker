@@ -273,38 +273,38 @@ export default function LoginPage() {
               <div className="flex flex-wrap gap-1.5 justify-center">
                 <button
                   type="button"
-                  onClick={() => quickFillStaff('priya.admin@dermatrack.clinic', 'admin123')}
+                  onClick={() => quickFillStaff('aruna_hair_care@gmail.com', 'pass123')}
                   className="text-[11px] font-mono px-2 py-1 bg-[var(--surface-2)] hover:bg-[var(--surface-3)] border border-[var(--border)] rounded text-[var(--text-dim)] hover:text-[var(--brass)]"
                 >
                   Admin
                 </button>
                 <button
                   type="button"
-                  onClick={() => quickFillStaff('ananya.sharma@dermatrack.clinic', 'doctor123')}
+                  onClick={() => quickFillStaff('aruna.vimal@gmail.com', 'pass123')}
                   className="text-[11px] font-mono px-2 py-1 bg-[var(--surface-2)] hover:bg-[var(--surface-3)] border border-[var(--border)] rounded text-[var(--text-dim)] hover:text-[var(--brass)]"
                 >
                   Doctor
                 </button>
                 <button
                   type="button"
-                  onClick={() => quickFillStaff('kavitha.reception@dermatrack.clinic', 'staff123')}
+                  onClick={() => quickFillStaff('aruna.sharmi@gmail.com', 'pass123')}
                   className="text-[11px] font-mono px-2 py-1 bg-[var(--surface-2)] hover:bg-[var(--surface-3)] border border-[var(--border)] rounded text-[var(--text-dim)] hover:text-[var(--brass)]"
                 >
                   Receptionist
                 </button>
                 <button
                   type="button"
-                  onClick={() => quickFillStaff('suresh.pharma@dermatrack.clinic', 'staff123')}
+                  onClick={() => quickFillStaff('aruna.kavitha@gmail.com', 'pass123')}
                   className="text-[11px] font-mono px-2 py-1 bg-[var(--surface-2)] hover:bg-[var(--surface-3)] border border-[var(--border)] rounded text-[var(--text-dim)] hover:text-[var(--brass)]"
                 >
-                  Pharmacy
+                  MedicationGiver
                 </button>
                 <button
                   type="button"
-                  onClick={() => quickFillStaff('ramesh.inventory@dermatrack.clinic', 'staff123')}
+                  onClick={() => quickFillStaff('aruna.yakavi@gmail.com', 'pass123')}
                   className="text-[11px] font-mono px-2 py-1 bg-[var(--surface-2)] hover:bg-[var(--surface-3)] border border-[var(--border)] rounded text-[var(--text-dim)] hover:text-[var(--brass)]"
                 >
-                  Stock
+                  StockManager
                 </button>
               </div>
             </div>
@@ -326,15 +326,24 @@ export default function LoginPage() {
                       type="tel"
                       required
                       maxLength={10}
-                      placeholder="e.g. 9876543210"
+                      placeholder="e.g. 0123456789"
                       value={phone}
                       onChange={(e) => setPhone(e.target.value.replace(/\D/g, '').slice(0, 10))}
                       className="w-full pl-9 pr-3 py-2 text-sm bg-[var(--surface-2)] border border-[var(--border)] rounded-md text-[var(--text)] focus:outline-none focus:border-[var(--brass)] font-mono tracking-wider"
                     />
                   </div>
-                  <span className="text-[11px] text-[var(--text-dim)] mt-1 block">
-                    Demo phone: <code className="text-[var(--brass)]">9876543210</code> (Aarav Mehta)
-                  </span>
+                  <div className="flex items-center justify-between mt-1.5">
+                    <span className="text-[11px] text-[var(--text-dim)]">
+                      Demo phone: <code className="text-[var(--brass)]">0123456789</code> (OTP: <code className="text-[var(--brass)]">123456</code>)
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => setPhone('0123456789')}
+                      className="text-[10px] font-mono px-1.5 py-0.5 bg-[var(--surface-2)] hover:bg-[var(--surface-3)] border border-[var(--border)] rounded text-[var(--brass)] hover:underline"
+                    >
+                      Use Demo
+                    </button>
+                  </div>
                 </div>
 
               {/* Channel Picker */}
@@ -415,9 +424,19 @@ export default function LoginPage() {
                       {sentChannel === 'whatsapp' ? '💬 WhatsApp' : '📱 SMS'}
                     </span>
                   </span>
-                  {devOtpHint && (
-                    <div className="mt-2 p-2 bg-[var(--brass-glow)] border border-[var(--brass)]/30 rounded text-xs font-mono text-[var(--brass)]">
-                      ⚡ Dev Mode OTP: <strong>{devOtpHint}</strong>
+                  {(devOtpHint || phone === '0123456789') && (
+                    <div className="mt-2 p-2 bg-[var(--brass-glow)] border border-[var(--brass)]/30 rounded text-xs font-mono text-[var(--brass)] flex items-center justify-between">
+                      <span>⚡ Demo OTP: <strong>{devOtpHint || '123456'}</strong></span>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const code = (devOtpHint || '123456').slice(0, 6).split('');
+                          setOtpDigits(code);
+                        }}
+                        className="text-[10px] font-bold px-2 py-0.5 bg-[var(--brass)] text-black rounded hover:opacity-90 transition-opacity"
+                      >
+                        Auto-Fill
+                      </button>
                     </div>
                   )}
                 </div>

@@ -92,7 +92,7 @@ export default function ReceptionistPage() {
     email: '',
     location: '',
     dateOfBirth: '',
-    gender: 'Male' as 'Male' | 'Female' | 'Other',
+    gender: '' as '' | 'Male' | 'Female' | 'Other',
     maritalStatus: '' as '' | 'Single' | 'Married' | 'Divorced' | 'Widowed',
     weightKg: '',
     heightCm: '',
@@ -216,7 +216,8 @@ export default function ReceptionistPage() {
   const [apptSelectedPatient, setApptSelectedPatient] = useState<Patient | null>(null);
   const [apptNewName, setApptNewName] = useState('');
   const [apptNewPhone, setApptNewPhone] = useState('');
-  const [apptNewGender, setApptNewGender] = useState<'Male' | 'Female' | 'Other'>('Male');
+  const [apptNewGender, setApptNewGender] = useState<'' | 'Male' | 'Female' | 'Other'>('');
+  const [apptNewDob, setApptNewDob] = useState('');
   const [apptNewEmail, setApptNewEmail] = useState('');
   const [apptDoctorId, setApptDoctorId] = useState('');
   const [apptDate, setApptDate] = useState<string>(() => {
@@ -510,6 +511,18 @@ export default function ReceptionistPage() {
       toast.error('Please fill name, phone, and select doctor');
       return;
     }
+    if (!newPatient.gender) {
+      toast.error('Please select patient gender');
+      return;
+    }
+    if (!newPatient.dateOfBirth) {
+      toast.error('Please enter patient date of birth');
+      return;
+    }
+    if (new Date(newPatient.dateOfBirth) > new Date()) {
+      toast.error('Date of birth cannot be in the future');
+      return;
+    }
     if (!newPatient.weightKg || isNaN(Number(newPatient.weightKg)) || Number(newPatient.weightKg) <= 0) {
       toast.error('Please enter patient weight (kg)');
       return;
@@ -530,10 +543,10 @@ export default function ReceptionistPage() {
         name: newPatient.name.trim(),
         phone: newPatient.phone.trim(),
         gender: newPatient.gender,
+        dateOfBirth: newPatient.dateOfBirth,
       };
       if (newPatient.email?.trim()) payload.email = newPatient.email.trim();
       if (newPatient.location?.trim()) payload.location = newPatient.location.trim();
-      if (newPatient.dateOfBirth) payload.dateOfBirth = newPatient.dateOfBirth;
       if (newPatient.maritalStatus) payload.maritalStatus = newPatient.maritalStatus;
       if (newPatient.heightCm) payload.heightCm = Number(newPatient.heightCm);
       if (newPatient.bloodGroup) payload.bloodGroup = newPatient.bloodGroup;
@@ -563,7 +576,7 @@ export default function ReceptionistPage() {
         email: '',
         location: '',
         dateOfBirth: '',
-        gender: 'Male',
+        gender: '',
         maritalStatus: '',
         weightKg: '',
         heightCm: '',
@@ -732,6 +745,18 @@ export default function ReceptionistPage() {
         toast.error('Please enter patient name and phone number');
         return;
       }
+      if (!apptNewGender) {
+        toast.error('Please select patient gender');
+        return;
+      }
+      if (!apptNewDob) {
+        toast.error('Please enter patient date of birth');
+        return;
+      }
+      if (new Date(apptNewDob) > new Date()) {
+        toast.error('Date of birth cannot be in the future');
+        return;
+      }
       setApptPhoneError(null);
       if (apptNewPhone.trim().length < 10) {
         setApptPhoneError('Phone number must be at least 10 digits');
@@ -744,6 +769,7 @@ export default function ReceptionistPage() {
           name: apptNewName.trim(),
           phone: apptNewPhone.trim(),
           gender: apptNewGender,
+          dateOfBirth: apptNewDob,
           email: apptNewEmail.trim() || undefined,
         });
         targetPatientId = pRes.data.data._id;
@@ -791,6 +817,8 @@ export default function ReceptionistPage() {
       setApptPatientsList([]);
       setApptNewName('');
       setApptNewPhone('');
+      setApptNewGender('');
+      setApptNewDob('');
       setApptNewEmail('');
       setApptNotes('');
       fetchData();
@@ -2044,13 +2072,15 @@ export default function ReceptionistPage() {
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                   <div>
                     <label className="block text-xs font-mono text-[var(--text-dim)] uppercase tracking-wider mb-1.5">
-                      Gender
+                      Gender *
                     </label>
                     <select
+                      required
                       value={newPatient.gender}
                       onChange={(e) => setNewPatient({ ...newPatient, gender: e.target.value as any })}
                       className="w-full px-3 py-2 text-sm bg-[var(--surface)] border border-[var(--border)] rounded-md text-[var(--text)] focus:outline-none focus:border-[var(--brass)]"
                     >
+                      <option value="">Select Gender *</option>
                       <option value="Male">Male</option>
                       <option value="Female">Female</option>
                       <option value="Other">Other</option>
@@ -2058,10 +2088,12 @@ export default function ReceptionistPage() {
                   </div>
                   <div>
                     <label className="block text-xs font-mono text-[var(--text-dim)] uppercase tracking-wider mb-1.5">
-                      Date of Birth
+                      Date of Birth *
                     </label>
                     <input
                       type="date"
+                      required
+                      max={new Date().toISOString().split('T')[0]}
                       value={newPatient.dateOfBirth}
                       onChange={(e) => setNewPatient({ ...newPatient, dateOfBirth: e.target.value })}
                       className="w-full px-3 py-2 text-sm bg-[var(--surface)] border border-[var(--border)] rounded-md text-[var(--text)] focus:outline-none focus:border-[var(--brass)] font-mono"
@@ -3258,18 +3290,31 @@ export default function ReceptionistPage() {
                       )}
                     </div>
                   </div>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                     <div>
-                      <label className="block text-[11px] font-mono text-[var(--text-dim)] uppercase mb-1">Gender</label>
+                      <label className="block text-[11px] font-mono text-[var(--text-dim)] uppercase mb-1">Gender *</label>
                       <select
+                        required
                         value={apptNewGender}
                         onChange={(e) => setApptNewGender(e.target.value as any)}
                         className="w-full px-2.5 py-1.5 text-xs bg-[var(--surface-card)] border border-[var(--border)] rounded focus:border-[var(--brass)] focus:outline-none cursor-pointer"
                       >
+                        <option value="">Select Gender *</option>
                         <option value="Male">Male</option>
                         <option value="Female">Female</option>
                         <option value="Other">Other</option>
                       </select>
+                    </div>
+                    <div>
+                      <label className="block text-[11px] font-mono text-[var(--text-dim)] uppercase mb-1">Date of Birth *</label>
+                      <input
+                        type="date"
+                        required
+                        max={new Date().toISOString().split('T')[0]}
+                        value={apptNewDob}
+                        onChange={(e) => setApptNewDob(e.target.value)}
+                        className="w-full px-2.5 py-1.5 text-xs bg-[var(--surface-card)] border border-[var(--border)] rounded focus:border-[var(--brass)] focus:outline-none font-mono"
+                      />
                     </div>
                     <div>
                       <label className="block text-[11px] font-mono text-[var(--text-dim)] uppercase mb-1">Email (Optional)</label>

@@ -133,8 +133,9 @@ router.post('/otp/send', otpLimiter, validate(sendOtpSchema), async (req: AuthRe
   }
 
   // 3. OTP generation: HARDCODE_DEV_OTP=true forces 123456 for quick testing;
-  //    otherwise always use cryptographically secure CSPRNG regardless of NODE_ENV.
-  const useHardcoded = env.HARDCODE_DEV_OTP === 'true';
+  //    Demo patient (0123456789) always gets 123456 across SMS and WhatsApp.
+  const isDemoPatient = phone === '0123456789';
+  const useHardcoded = env.HARDCODE_DEV_OTP === 'true' || isDemoPatient;
   const otp = useHardcoded
     ? '123456'
     : crypto.randomInt(100000, 1000000).toString();
@@ -161,7 +162,7 @@ router.post('/otp/send', otpLimiter, validate(sendOtpSchema), async (req: AuthRe
 
   if (!dispatchResult.success && !dispatchResult.fallback) {
     console.error(`❌ [AUTH] OTP dispatch failed via ${channel} to ${phone}: ${dispatchResult.error}`);
-    if (env.NODE_ENV === 'production' && !useHardcoded) {
+    if (env.NODE_ENV === 'production' && !useHardcoded && !isDemoPatient) {
       throw new AppError('Failed to send OTP. Please try again.', 503, 'OTP_DELIVERY_FAILED');
     }
     console.warn(`⚠️  [AUTH] DEV: OTP delivery failed. Use devOtp from response.`);
@@ -187,6 +188,46 @@ const verifyOtpSchema = z.object({
 
 router.post('/otp/verify', validate(verifyOtpSchema), async (req: AuthRequest, res: Response) => {
   const { phone, otp } = req.body;
+  const isDemoPatient = phone === '0123456789';
+
+  // Demo patient quick verify with fixed OTP 123456
+  if (isDemoPatient && otp === '123456') {
+    let patient = await Patient.findOne({ phone, isActive: true });
+    if (!patient) {
+      patient = await Patient.findOne({ phone });
+      if (patient) {
+        patient.isActive = true;
+        await patient.save();
+      } else {
+        patient = await Patient.create({
+          patientId: 'PAT-000001',
+          name: 'Aarav Mehta',
+          phone: '0123456789',
+          email: 'aarav.mehta@gmail.com',
+          location: 'Chennai Central',
+          gender: 'Male',
+          isActive: true,
+        });
+      }
+    }
+
+    await OTP.deleteOne({ phone }).catch(() => {});
+
+    const token = jwt.sign(
+      { id: patient._id, role: 'Patient', type: 'patient', fullName: patient.name },
+      env.JWT_SECRET,
+      { expiresIn: '7d' }
+    );
+
+    res.cookie('token', token, COOKIE_OPTIONS);
+    return res.json({
+      success: true,
+      data: {
+        patient: patient.toJSON(),
+        token,
+      },
+    });
+  }
 
   const otpRecord = await OTP.findOne({ phone });
   if (!otpRecord) throw new AppError('OTP expired or not found. Please request a new code.', 400, 'OTP_EXPIRED');

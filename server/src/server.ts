@@ -30,6 +30,7 @@ import tunnelRoutes from './routes/tunnelRoutes';
 import paymentRoutes from './routes/paymentRoutes';
 import { tunnelManager } from './config/tunnelManager';
 import { initWhatsApp, getWhatsAppStatus, getWhatsAppQr, triggerReconnect } from './services/whatsappService';
+import { ensureDemoAccounts } from './utils/ensureDemoAccounts';
 
 const app = express();
 const server = http.createServer(app);
@@ -114,6 +115,7 @@ initSocket(server);
 // Start Server
 async function start() {
   await connectDB();
+  await ensureDemoAccounts();
 
   const port = parseInt(env.PORT, 10) || 5000;
   server.listen(port, () => {

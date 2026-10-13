@@ -20,12 +20,14 @@ router.use(authMiddleware, receptionistOrAdmin, auditMiddleware('receptionist'))
 // ==================== PATIENTS ====================
 
 const createPatientSchema = z.object({
-  name: z.string().min(1),
-  phone: z.string().min(10).max(15),
+  name: z.string().min(1, 'Patient name is mandatory'),
+  phone: z.string().min(10, 'Phone number must be at least 10 digits').max(15),
   email: z.string().email().optional().or(z.literal('')),
   location: z.string().optional(),
-  dateOfBirth: z.string().optional(),
-  gender: z.enum(['Male', 'Female', 'Other']).optional(),
+  dateOfBirth: z.string().min(1, 'Date of birth is mandatory'),
+  gender: z.enum(['Male', 'Female', 'Other'], {
+    errorMap: () => ({ message: 'Gender is mandatory (Male, Female, or Other)' }),
+  }),
   bloodGroup: z.enum(['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-', 'Unknown']).optional(),
   maritalStatus: z.enum(['Single', 'Married', 'Divorced', 'Widowed']).optional().or(z.literal('')),
   heightCm: z.union([z.number(), z.string().regex(/^\d+(\.\d+)?$/).transform(Number)]).optional(),
@@ -50,6 +52,18 @@ router.post('/patients', validate(createPatientSchema), async (req: AuthRequest,
     patientId,
     hospitalId: req.user?.hospitalId,
     dateOfBirth: req.body.dateOfBirth ? new Date(req.body.dateOfBirth) : undefined,
+    age: (() => {
+      if (!req.body.dateOfBirth) return undefined;
+      const dob = new Date(req.body.dateOfBirth);
+      if (isNaN(dob.getTime())) return undefined;
+      const today = new Date();
+      let calculatedAge = today.getFullYear() - dob.getFullYear();
+      const m = today.getMonth() - dob.getMonth();
+      if (m < 0 || (m === 0 && today.getDate() < dob.getDate())) {
+        calculatedAge--;
+      }
+      return calculatedAge >= 0 ? calculatedAge : 0;
+    })(),
     // Convert comma-separated allergies string to a clean array
     allergies: req.body.allergies
       ? req.body.allergies

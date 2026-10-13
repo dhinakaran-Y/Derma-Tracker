@@ -62,19 +62,19 @@ async function seed() {
   // Passwords will be hashed by User pre-save hook
   const admin = await User.create({
     username: 'admin',
-    passwordHash: 'admin123',
-    fullName: 'Dr. Priya Menon (Admin)',
-    email: 'priya.admin@dermatrack.clinic',
+    passwordHash: 'pass123',
+    fullName: 'Aruna Hair Care (Admin)',
+    email: 'aruna_hair_care@gmail.com',
     role: 'Admin',
     status: 'Active',
     hospitalId: flagshipHospital._id,
   });
 
   const doctor1 = await User.create({
-    username: 'dr.ananya',
-    passwordHash: 'doctor123',
-    fullName: 'Dr. Ananya Sharma',
-    email: 'ananya.sharma@dermatrack.clinic',
+    username: 'dr.vimal',
+    passwordHash: 'pass123',
+    fullName: 'Dr. Vimal',
+    email: 'aruna.vimal@gmail.com',
     role: 'Doctor',
     status: 'Active',
     specialization: 'Dermatology & Trichology',
@@ -86,7 +86,7 @@ async function seed() {
 
   const doctor2 = await User.create({
     username: 'dr.rajesh',
-    passwordHash: 'doctor123',
+    passwordHash: 'pass123',
     fullName: 'Dr. Rajesh Varma',
     email: 'rajesh.varma@dermatrack.clinic',
     role: 'Doctor',
@@ -100,38 +100,38 @@ async function seed() {
 
   const receptionist = await User.create({
     username: 'receptionist',
-    passwordHash: 'staff123',
-    fullName: 'Kavitha Ram',
-    email: 'kavitha.reception@dermatrack.clinic',
+    passwordHash: 'pass123',
+    fullName: 'Sharmi (Receptionist)',
+    email: 'aruna.sharmi@gmail.com',
     role: 'Receptionist',
     status: 'Active',
   });
 
   const medGiver = await User.create({
     username: 'medgiver',
-    passwordHash: 'staff123',
-    fullName: 'Suresh Kumar (Pharm)',
-    email: 'suresh.pharma@dermatrack.clinic',
+    passwordHash: 'pass123',
+    fullName: 'Kavitha (Medication Giver)',
+    email: 'aruna.kavitha@gmail.com',
     role: 'MedicationGiver',
     status: 'Active',
   });
 
   const stockManager = await User.create({
     username: 'stockmanager',
-    passwordHash: 'staff123',
-    fullName: 'Ramesh Patel (Inventory)',
-    email: 'ramesh.inventory@dermatrack.clinic',
+    passwordHash: 'pass123',
+    fullName: 'Yakavi (Stock Manager)',
+    email: 'aruna.yakavi@gmail.com',
     role: 'StockManager',
     status: 'Active',
   });
 
-  console.log('👤 Created Staff accounts: admin, dr.ananya, dr.rajesh, receptionist, medgiver, stockmanager');
+  console.log('👤 Created Staff accounts: admin (aruna_hair_care@gmail.com), dr.vimal (aruna.vimal@gmail.com), receptionist (aruna.sharmi@gmail.com), medgiver (aruna.kavitha@gmail.com), stockmanager (aruna.yakavi@gmail.com)');
 
   // 3. Patients
   const patient1 = await Patient.create({
     patientId: 'PAT-000001',
     name: 'Aarav Mehta',
-    phone: '9876543210',
+    phone: '0123456789',
     email: 'aarav.mehta@gmail.com',
     location: 'Chennai Central',
     dateOfBirth: new Date('1990-04-12'),
@@ -161,7 +161,7 @@ async function seed() {
     isActive: true,
   });
 
-  console.log('🧑‍🤝‍🧑 Created Demo Patients: Aarav Mehta (9876543210), Sneha Reddy (9876543211), Vikram (9876543212)');
+  console.log('🧑‍🤝‍🧑 Created Demo Patients: Aarav Mehta (0123456789), Sneha Reddy (9876543211), Vikram (9876543212)');
 
   // 4. Medicines & Batches — Real clinic medicines from asset images (serum-img/, tablet-img/, Shampoo-img/)
 
