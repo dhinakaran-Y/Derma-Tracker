@@ -8,55 +8,63 @@ import { Hospital } from '../models/Hospital';
  */
 export async function ensureDemoAccounts(): Promise<void> {
   try {
-    const flagshipHospital = await Hospital.findOne({ status: 'Active' });
+    const flagshipHospital = await Hospital.findOne({
+      $or: [
+        { shortName: { $regex: /aruna/i } },
+        { name: { $regex: /aruna/i } },
+        { email: 'aruna_hair_care@gmail.com' },
+      ],
+      status: 'Active',
+    }) || await Hospital.findOne({ status: 'Active' });
     const hospitalId = flagshipHospital?._id;
 
     const demoStaff = [
       {
         email: 'aruna_hair_care@gmail.com',
-        username: 'admin',
-        fullName: 'Aruna Hair Care (Admin)',
+        username: 'aruna_hair_care',
+        fullName: 'Aruna Admin',
         role: 'Admin' as const,
         password: 'pass123',
       },
       {
         email: 'aruna.vimal@gmail.com',
-        username: 'dr.vimal',
-        fullName: 'Dr. Vimal',
+        username: 'vimal',
+        fullName: 'vimal',
         role: 'Doctor' as const,
         password: 'pass123',
         specialization: 'Dermatology & Trichology',
       },
       {
         email: 'aruna.sharmi@gmail.com',
-        username: 'receptionist',
-        fullName: 'Sharmi (Receptionist)',
+        username: 'sharmi',
+        fullName: 'sharmila',
         role: 'Receptionist' as const,
         password: 'pass123',
       },
       {
         email: 'aruna.kavitha@gmail.com',
-        username: 'medgiver',
-        fullName: 'Kavitha (Medication Giver)',
+        username: 'kavitha',
+        fullName: 'aruna.kavitha',
         role: 'MedicationGiver' as const,
         password: 'pass123',
       },
       {
         email: 'aruna.yakavi@gmail.com',
-        username: 'stockmanager',
-        fullName: 'Yakavi (Stock Manager)',
+        username: 'yakavi',
+        fullName: 'aruna.yakavi',
         role: 'StockManager' as const,
         password: 'pass123',
       },
     ];
 
     for (const staff of demoStaff) {
+      // Find specifically by email or username, prioritizing the Aruna hospital
       let user = await User.findOne({
         $or: [
           { email: staff.email.toLowerCase() },
           { username: staff.username.toLowerCase() },
-          { role: staff.role },
         ],
+        ...(hospitalId ? { hospitalId } : {}),
       });
 
       if (!user) {
@@ -79,6 +87,12 @@ export async function ensureDemoAccounts(): Promise<void> {
         if (user.email !== staff.email) {
           user.email = staff.email;
           changed = true;
+        }
+        if (hospitalId && (!user.hospitalId || user.hospitalId.toString() !== hospitalId.toString())) {
+          if (user.email === staff.email) {
+            user.hospitalId = hospitalId;
+            changed = true;
+          }
         }
         if (user.status !== 'Active') {
           user.status = 'Active';
