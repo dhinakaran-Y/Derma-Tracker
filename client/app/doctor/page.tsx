@@ -195,6 +195,7 @@ export default function DoctorPage() {
   const [activeScalpCarouselIdx, setActiveScalpCarouselIdx] = useState(0);
   const [deletingImageFilename, setDeletingImageFilename] = useState<string | null>(null);
   const [isUploadingLocal, setIsUploadingLocal] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState<{ percent: number; current: number; total: number; label: string } | null>(null);
   const localFileInputRef = useRef<HTMLInputElement | null>(null);
 
 
@@ -351,17 +352,37 @@ export default function DoctorPage() {
 
     try {
       setIsUploadingLocal(true);
-      toast.loading(`Uploading ${filesToUpload.length} clinical photo(s) from local drive...`, {
-        id: 'local-scalp-upload',
-      });
+      setUploadProgress({ percent: 0, current: 0, total: filesToUpload.length, label: 'Preparing upload...' });
 
       let updatedImages: string[] = activeVisit.scalpImages || [];
-      for (const file of filesToUpload) {
+      for (let i = 0; i < filesToUpload.length; i++) {
+        const file = filesToUpload[i];
         const formData = new FormData();
         formData.append('image', file);
 
+        setUploadProgress({
+          percent: Math.round((i / filesToUpload.length) * 100),
+          current: i + 1,
+          total: filesToUpload.length,
+          label: `Uploading photo ${i + 1} of ${filesToUpload.length}...`,
+        });
+
         const res = await api.post(`/doctor/visits/${activeVisit._id}/images`, formData, {
           headers: { 'Content-Type': 'multipart/form-data' },
+          onUploadProgress: (progressEvent) => {
+            const filePercent = progressEvent.total
+              ? Math.round((progressEvent.loaded / progressEvent.total) * 100)
+              : 0;
+            const overallPercent = Math.round(((i + filePercent / 100) / filesToUpload.length) * 100);
+            setUploadProgress({
+              percent: Math.min(overallPercent, 99),
+              current: i + 1,
+              total: filesToUpload.length,
+              label: filesToUpload.length > 1
+                ? `Uploading photo ${i + 1}/${filesToUpload.length} — ${filePercent}%`
+                : `Uploading — ${filePercent}%`,
+            });
+          },
         });
 
         if (res.data?.success && res.data.data?.scalpImages) {
@@ -369,6 +390,7 @@ export default function DoctorPage() {
         }
       }
 
+      setUploadProgress({ percent: 100, current: filesToUpload.length, total: filesToUpload.length, label: 'Upload complete!' });
       setActiveVisit((prev) => (prev ? { ...prev, scalpImages: updatedImages } : null));
       setActiveScalpCarouselIdx(0);
       toast.success(
@@ -377,10 +399,12 @@ export default function DoctorPage() {
           : `${filesToUpload.length} clinical scalp photos uploaded from local drive!`,
         { id: 'local-scalp-upload' }
       );
+      setTimeout(() => setUploadProgress(null), 1500);
     } catch (err) {
       toast.error(getErrorMessage(err, 'Failed to upload photo from local drive'), {
         id: 'local-scalp-upload',
       });
+      setUploadProgress(null);
     } finally {
       setIsUploadingLocal(false);
       if (localFileInputRef.current) localFileInputRef.current.value = '';
@@ -716,6 +740,46 @@ export default function DoctorPage() {
           style={{ display: 'none' }}
           onChange={handleLocalFileUpload}
         />
+
+        {/* Live Upload Progress Overlay */}
+        {uploadProgress && (
+          <div className="mb-4 p-4 rounded-xl bg-gradient-to-r from-teal-950/80 to-slate-900/90 border border-teal-500/30 shadow-lg shadow-teal-500/10 animate-fadeIn">
+            <div className="flex items-center justify-between mb-2">
+              <div className="flex items-center gap-2">
+                <div className="relative w-5 h-5">
+                  <svg className="w-5 h-5 -rotate-90" viewBox="0 0 20 20">
+                    <circle cx="10" cy="10" r="8" fill="none" stroke="currentColor" className="text-slate-700" strokeWidth="2" />
+                    <circle cx="10" cy="10" r="8" fill="none" stroke="currentColor" className="text-teal-400" strokeWidth="2"
+                      strokeDasharray={`${uploadProgress.percent * 0.5} 50`}
+                      strokeLinecap="round"
+                      style={{ transition: 'stroke-dasharray 0.3s ease' }}
+                    />
+                  </svg>
+                  {uploadProgress.percent >= 100 && (
+                    <CheckCircle className="absolute inset-0 w-5 h-5 text-emerald-400" />
+                  )}
+                </div>
+                <span className="text-xs font-semibold text-teal-300">{uploadProgress.label}</span>
+              </div>
+              <span className="text-sm font-bold font-mono text-teal-400">{uploadProgress.percent}%</span>
+            </div>
+            <div className="w-full h-2 bg-slate-800 rounded-full overflow-hidden">
+              <div
+                className={`h-full rounded-full transition-all duration-300 ease-out ${
+                  uploadProgress.percent >= 100
+                    ? 'bg-gradient-to-r from-emerald-500 to-emerald-400'
+                    : 'bg-gradient-to-r from-teal-600 via-teal-400 to-cyan-400'
+                }`}
+                style={{ width: `${uploadProgress.percent}%` }}
+              />
+            </div>
+            {uploadProgress.total > 1 && (
+              <p className="text-[10px] text-slate-400 mt-1.5 font-mono">
+                File {uploadProgress.current} of {uploadProgress.total}
+              </p>
+            )}
+          </div>
+        )}
 
         {!hasImages ? (
           /* Empty State */

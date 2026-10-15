@@ -26,6 +26,7 @@ export function ScalpCameraModal({
   const [stream, setStream] = useState<MediaStream | null>(null);
   const [capturing, setCapturing] = useState(false);
   const [uploading, setUploading] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [images, setImages] = useState<string[]>(initialImages);
   const [deletingFilename, setDeletingFilename] = useState<string | null>(null);
@@ -153,20 +154,30 @@ export function ScalpCameraModal({
       if (!blob) throw new Error('Failed to create image frame from camera');
 
       setUploading(true);
+      setUploadProgress(0);
       const formData = new FormData();
       formData.append('image', blob, `scalp-${Date.now()}.jpg`);
 
       const res = await api.post(`/doctor/visits/${visitId}/images`, formData, {
         headers: { 'Content-Type': 'multipart/form-data' },
+        onUploadProgress: (progressEvent) => {
+          const pct = progressEvent.total
+            ? Math.round((progressEvent.loaded / progressEvent.total) * 100)
+            : 0;
+          setUploadProgress(Math.min(pct, 99));
+        },
       });
 
       if (res.data?.success && res.data.data?.scalpImages) {
+        setUploadProgress(100);
         const updated = res.data.data.scalpImages;
         setImages(updated);
         onImagesUpdated(updated);
+        setTimeout(() => setUploadProgress(null), 1200);
       }
     } catch (err) {
       setError(getErrorMessage(err, 'Failed to capture or upload photo'));
+      setUploadProgress(null);
     } finally {
       setCapturing(false);
       setUploading(false);
@@ -185,14 +196,23 @@ export function ScalpCameraModal({
     try {
       setUploading(true);
       setError(null);
+      setUploadProgress(0);
 
       let updated = [...images];
-      for (const file of fileList) {
+      for (let i = 0; i < fileList.length; i++) {
+        const file = fileList[i];
         const formData = new FormData();
         formData.append('image', file);
 
         const res = await api.post(`/doctor/visits/${visitId}/images`, formData, {
           headers: { 'Content-Type': 'multipart/form-data' },
+          onUploadProgress: (progressEvent) => {
+            const filePercent = progressEvent.total
+              ? Math.round((progressEvent.loaded / progressEvent.total) * 100)
+              : 0;
+            const overallPercent = Math.round(((i + filePercent / 100) / fileList.length) * 100);
+            setUploadProgress(Math.min(overallPercent, 99));
+          },
         });
 
         if (res.data?.success && res.data.data?.scalpImages) {
@@ -200,10 +220,13 @@ export function ScalpCameraModal({
         }
       }
 
+      setUploadProgress(100);
       setImages(updated);
       onImagesUpdated(updated);
+      setTimeout(() => setUploadProgress(null), 1200);
     } catch (err) {
       setError(getErrorMessage(err, 'Failed to upload photo from local drive'));
+      setUploadProgress(null);
     } finally {
       setUploading(false);
       if (modalFileInputRef.current) modalFileInputRef.current.value = '';
@@ -319,6 +342,28 @@ export function ScalpCameraModal({
               <div className="w-2 h-2 bg-teal-400 rounded-full" />
             </div>
           </div>
+
+          {/* Upload Progress Overlay on Viewfinder */}
+          {uploading && uploadProgress !== null && (
+            <div className="absolute bottom-0 inset-x-0 bg-gradient-to-t from-black/90 via-black/60 to-transparent p-4 pointer-events-none">
+              <div className="flex items-center justify-between mb-1.5">
+                <span className="text-xs font-semibold text-teal-300">
+                  {uploadProgress >= 100 ? '✓ Upload complete' : 'Uploading scalp photo...'}
+                </span>
+                <span className="text-sm font-bold font-mono text-teal-400">{uploadProgress}%</span>
+              </div>
+              <div className="w-full h-2 bg-slate-800/80 rounded-full overflow-hidden">
+                <div
+                  className={`h-full rounded-full transition-all duration-300 ease-out ${
+                    uploadProgress >= 100
+                      ? 'bg-gradient-to-r from-emerald-500 to-emerald-400'
+                      : 'bg-gradient-to-r from-teal-600 via-teal-400 to-cyan-400'
+                  }`}
+                  style={{ width: `${uploadProgress}%` }}
+                />
+              </div>
+            </div>
+          )}
 
           {/* Shutter flash effect */}
           {capturing && <div className="absolute inset-0 bg-white/70 animate-pulse pointer-events-none" />}

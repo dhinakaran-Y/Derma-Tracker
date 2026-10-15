@@ -140,6 +140,7 @@ export default function MobilePairingPage() {
 
   // Photo capture
   const [uploading, setUploading] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState<number | null>(null);
   const [uploadSuccess, setUploadSuccess] = useState<string | null>(null);
   const [deletingFilename, setDeletingFilename] = useState<string | null>(null);
   const [cameraModalOpen, setCameraModalOpen] = useState(false);
@@ -352,6 +353,7 @@ export default function MobilePairingPage() {
       setUploading(true);
       setError(null);
       setUploadSuccess(null);
+      setUploadProgress(0);
 
       // Compress client-side to ensure max 1920px Full HD and avoid Android memory issues
       const compressedBlob = await compressImage(blob, 1920, 0.85);
@@ -362,18 +364,26 @@ export default function MobilePairingPage() {
       const res = await mobileApi.post(`/device-pairing/${currentToken}/upload`, formData, {
         headers: { 'Content-Type': 'multipart/form-data' },
         timeout: 30000,
+        onUploadProgress: (progressEvent) => {
+          const pct = progressEvent.total
+            ? Math.round((progressEvent.loaded / progressEvent.total) * 100)
+            : 0;
+          setUploadProgress(Math.min(pct, 99));
+        },
       });
 
       if (res.data?.success && res.data.data) {
+        setUploadProgress(100);
         setActiveVisit((prev) =>
           prev ? { ...prev, count: res.data.data.count, scalpImages: res.data.data.scalpImages } : null
         );
         setUploadSuccess('Clinical photo captured & synced to workbench!');
-        setTimeout(() => setUploadSuccess(null), 5000);
+        setTimeout(() => { setUploadSuccess(null); setUploadProgress(null); }, 3000);
       }
     } catch (err: any) {
       setError(getErrorMessage(err, 'Upload failed. Please try again.'));
       setTimeout(() => setError(null), 5000);
+      setUploadProgress(null);
     } finally {
       setUploading(false);
       if (fileInputRef.current) fileInputRef.current.value = '';
@@ -737,13 +747,38 @@ export default function MobilePairingPage() {
                   }`}
                 >
                   {uploading ? (
-                    <><RefreshCw className="w-5 h-5 animate-spin" /> Uploading Photo...</>
+                    <>
+                      <RefreshCw className="w-5 h-5 animate-spin" />
+                      <span>Uploading{uploadProgress !== null ? ` — ${uploadProgress}%` : '...'}</span>
+                    </>
                   ) : isMaxReached ? (
                     <><CheckCircle2 className="w-5 h-5" /> Maximum {activeVisit.maxImages} Photos Reached</>
                   ) : (
                     <><Camera className="w-6 h-6" /> Open Live Camera</>
                   )}
                 </button>
+
+                {/* Live Upload Progress Bar */}
+                {uploading && uploadProgress !== null && (
+                  <div className="w-full rounded-2xl bg-slate-900/80 border border-teal-500/20 p-3">
+                    <div className="flex items-center justify-between mb-1.5">
+                      <span className="text-[11px] font-semibold text-teal-300">
+                        {uploadProgress >= 100 ? '✓ Synced to workbench' : 'Uploading to server...'}
+                      </span>
+                      <span className="text-xs font-bold font-mono text-teal-400">{uploadProgress}%</span>
+                    </div>
+                    <div className="w-full h-2.5 bg-slate-800 rounded-full overflow-hidden">
+                      <div
+                        className={`h-full rounded-full transition-all duration-300 ease-out ${
+                          uploadProgress >= 100
+                            ? 'bg-gradient-to-r from-emerald-500 to-emerald-400'
+                            : 'bg-gradient-to-r from-teal-600 via-teal-400 to-cyan-400'
+                        }`}
+                        style={{ width: `${uploadProgress}%` }}
+                      />
+                    </div>
+                  </div>
+                )}
 
                 {/* Gallery / File Picker Fallback Button */}
                 {!isMaxReached && (
@@ -849,6 +884,7 @@ export default function MobilePairingPage() {
           setCameraModalOpen(false);
         }}
         uploading={uploading}
+        uploadProgress={uploadProgress}
         title={activePatient ? `Capture: ${activePatient.name}` : 'Scalp Photo Viewfinder'}
       />
     </div>

@@ -8,6 +8,7 @@ interface MobileCameraModalProps {
   onClose: () => void;
   onCapture: (blob: Blob) => Promise<void>;
   uploading: boolean;
+  uploadProgress?: number | null;
   title?: string;
 }
 
@@ -16,6 +17,7 @@ export function MobileCameraModal({
   onClose,
   onCapture,
   uploading,
+  uploadProgress = null,
   title = 'Scalp Photo Viewfinder',
 }: MobileCameraModalProps) {
   const [stream, setStream] = useState<MediaStream | null>(null);
@@ -277,6 +279,28 @@ export function MobileCameraModal({
               </div>
             )}
           </>
+        )}
+
+        {/* Upload Progress Overlay */}
+        {uploading && uploadProgress !== null && (
+          <div className="absolute bottom-0 inset-x-0 z-15 bg-gradient-to-t from-black/90 via-black/50 to-transparent p-4 pointer-events-none">
+            <div className="flex items-center justify-between mb-1.5">
+              <span className="text-[11px] font-semibold text-teal-300">
+                {uploadProgress >= 100 ? '✓ Photo synced!' : 'Uploading photo...'}
+              </span>
+              <span className="text-xs font-bold font-mono text-teal-400">{uploadProgress}%</span>
+            </div>
+            <div className="w-full h-2 bg-slate-800/80 rounded-full overflow-hidden">
+              <div
+                className={`h-full rounded-full transition-all duration-300 ease-out ${
+                  uploadProgress >= 100
+                    ? 'bg-gradient-to-r from-emerald-500 to-emerald-400'
+                    : 'bg-gradient-to-r from-teal-600 via-teal-400 to-cyan-400'
+                }`}
+                style={{ width: `${uploadProgress}%` }}
+              />
+            </div>
+          </div>
         )}
       </div>
 
